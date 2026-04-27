@@ -1,0 +1,10 @@
+## Interface: 30300
+## Author: Redbu11
+## Title: UnitPlates
+## Version: 1
+## Notes: Best nameplates.
+## SavedVariables: UnitPlatesPlayersCache, UnitPlatesNPCCache
+## X-Website: https://github.com/Redbu11dev777
+
+Embeds.xml
+Core.xml
