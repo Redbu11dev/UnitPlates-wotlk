@@ -986,7 +986,7 @@ local function UpdatePlate(self)
 			local b = 0.1 -- Both start and end at 0.1		
 		
 			self.threat.text:SetTextColor(r, g, b, 1)
-			self.threat.text:SetText(threatpct.."%")
+			self.threat.text:SetText(string.format("%d", threatpct).."%")
 			self.threat.text:Show()
 		else
 			self.threat.text:Hide()
@@ -1567,7 +1567,7 @@ function addon:InitFrame(frame)
 	f.threat.text:SetJustifyH("RIGHT")
 	f.threat.text:SetTextColor(1,1,1,1)
 	f.threat.text:ClearAllPoints()
-	f.threat.text:SetPoint("TOPRIGHT", f.threat, "TOPRIGHT", 0, 0)
+	f.threat.text:SetPoint("TOPRIGHT", f.threat, "TOPRIGHT", 0, -1 * minimalOnePixel)
 	f.threat.text:SetText("100%")
 	f.threat.text:Hide()
 
