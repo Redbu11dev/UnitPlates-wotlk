@@ -593,15 +593,15 @@ local function UpdatePlate(self)
 	local unitId = GetUnitIDFromGUID(guid)
 	if not unitId then
 		--try to see if it is player and has same name in your party or raid
-		-- if UnitName("pet") == name then
-			-- unitId = "pet"
-			-- --also store guid?
-			-- guid = UnitGUID(unitId)
-		-- end
+		if UnitName("pet") == name then
+			unitId = "pet"
+			--also store guid?
+			guid = UnitGUID(unitId)
+		end
 		
 		--hacky unitId check for pets and party members
 		local unitIdFromName = GetUnitIDFromName(name)
-		if unitIdFromName then
+		if isPlayer and unitIdFromName then
 			unitId = unitIdFromName
 			guid = UnitGUID(unitId)
 		end
