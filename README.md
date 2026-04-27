@@ -4,7 +4,7 @@ A new version of https://github.com/Redbu11dev/ShaguPlates-extra for 3.3.5 (work
 
 Still a work in progress though, so might be bugged here and there, but already works alright
 
-Can show if the enemy is tapped (after you mouse over or target the enemy)
+Can show if enemy is tapped (after you mouse over or target the enemy)
 
 TODO LIST:
 
