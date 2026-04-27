@@ -25,6 +25,7 @@ Features:
 - Player class icons
 - "in combat" indicator on an NPC/player nameplate
 - Threat percentage
+- Totem icons
 - and more
 
 
