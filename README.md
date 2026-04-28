@@ -31,6 +31,7 @@ Features:
 - Combo points
 - Cast bar
 - Skill uses
+- Debuffs
 - and more
 
 
