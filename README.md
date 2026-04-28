@@ -28,6 +28,9 @@ Features:
 - "in combat" indicator on an NPC/player nameplate
 - Threat percentage
 - Totem icons
+- Combo points
+- Cast bar
+- Skill uses
 - and more
 
 
