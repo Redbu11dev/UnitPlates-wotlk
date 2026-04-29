@@ -1031,7 +1031,7 @@ local function UpdatePlate(self)
 	if unitId then
 		if self.debuffUpdateElapsed <= 0 then
 			self.debuffUpdateElapsed = debuffUnitIdUpdateTime
-			print("here")
+			--print("here")
 			UpdateDebuffs(self, unitId)
 		end
 	end
