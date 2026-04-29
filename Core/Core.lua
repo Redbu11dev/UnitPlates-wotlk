@@ -258,16 +258,7 @@ do
 		end
 
 		-- 4. Group Members (Raid or Party)
-		if IsInRaid() then
-			for i = 1, 40 do
-				local unit = "raid" .. i
-				local pet = "raidpet" .. i
-				if UnitName(unit) == name then return unit end
-				if UnitName(unit .. "target") == name then return unit .. "target" end
-				if UnitName(pet) == name then return pet end
-				if UnitName(pet .. "target") == name then return pet .. "target" end
-			end
-		else
+		if GetNumPartyMembers() > 0 then
 			for i = 1, 4 do
 				local unit = "party" .. i
 				local pet = "partypet" .. i
@@ -276,7 +267,35 @@ do
 				if UnitName(pet) == name then return pet end
 				if UnitName(pet .. "target") == name then return pet .. "target" end
 			end
+			
+			for i = 1, 40 do
+				local unit = "raid" .. i
+				local pet = "raidpet" .. i
+				if UnitName(unit) == name then return unit end
+				if UnitName(unit .. "target") == name then return unit .. "target" end
+				if UnitName(pet) == name then return pet end
+				if UnitName(pet .. "target") == name then return pet .. "target" end
+			end
 		end
+		-- if IsInRaid() then
+			-- for i = 1, 40 do
+				-- local unit = "raid" .. i
+				-- local pet = "raidpet" .. i
+				-- if UnitName(unit) == name then return unit end
+				-- if UnitName(unit .. "target") == name then return unit .. "target" end
+				-- if UnitName(pet) == name then return pet end
+				-- if UnitName(pet .. "target") == name then return pet .. "target" end
+			-- end
+		-- else
+			-- for i = 1, 4 do
+				-- local unit = "party" .. i
+				-- local pet = "partypet" .. i
+				-- if UnitName(unit) == name then return unit end
+				-- if UnitName(unit .. "target") == name then return unit .. "target" end
+				-- if UnitName(pet) == name then return pet end
+				-- if UnitName(pet .. "target") == name then return pet .. "target" end
+			-- end
+		-- end
 
 		return nil
 	end
@@ -319,16 +338,7 @@ do
 		end
 
 		-- 4. Group Members (Raid or Party)
-		if IsInRaid() then
-			for i = 1, 40 do
-				local unit = "raid" .. i
-				local pet = "raidpet" .. i
-				if UnitGUID(unit) == guid then return unit end
-				if UnitGUID(unit .. "target") == guid then return unit .. "target" end
-				if UnitGUID(pet) == guid then return pet end
-				if UnitGUID(pet .. "target") == guid then return pet .. "target" end
-			end
-		else
+		if GetNumPartyMembers() > 0 then
 			for i = 1, 4 do
 				local unit = "party" .. i
 				local pet = "partypet" .. i
@@ -337,7 +347,37 @@ do
 				if UnitGUID(pet) == guid then return pet end
 				if UnitGUID(pet .. "target") == guid then return pet .. "target" end
 			end
+			
+			for i = 1, 40 do
+				local unit = "raid" .. i
+				local pet = "raidpet" .. i
+				if UnitGUID(unit) == guid then return unit end
+				if UnitGUID(unit .. "target") == guid then return unit .. "target" end
+				if UnitGUID(pet) == guid then return pet end
+				if UnitGUID(pet .. "target") == guid then return pet .. "target" end
+			end
 		end
+		
+		
+		-- if IsInRaid() then
+			-- for i = 1, 40 do
+				-- local unit = "raid" .. i
+				-- local pet = "raidpet" .. i
+				-- if UnitGUID(unit) == guid then return unit end
+				-- if UnitGUID(unit .. "target") == guid then return unit .. "target" end
+				-- if UnitGUID(pet) == guid then return pet end
+				-- if UnitGUID(pet .. "target") == guid then return pet .. "target" end
+			-- end
+		-- else
+			-- for i = 1, 4 do
+				-- local unit = "party" .. i
+				-- local pet = "partypet" .. i
+				-- if UnitGUID(unit) == guid then return unit end
+				-- if UnitGUID(unit .. "target") == guid then return unit .. "target" end
+				-- if UnitGUID(pet) == guid then return pet end
+				-- if UnitGUID(pet .. "target") == guid then return pet .. "target" end
+			-- end
+		-- end
 
 		return nil
 	end
