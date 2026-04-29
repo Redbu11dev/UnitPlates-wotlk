@@ -633,6 +633,16 @@ local function UpdatePlate(self)
 	
 	--get guild
 	local guild = nil
+	
+	if not guild then
+		--try to get from cache
+		if isPlayer then
+			guild = RetrieveCachePlayerGuild(name, guild)
+		else
+			guild = RetrieveCacheNPCGuild(name, guild)
+		end
+	end
+	
 	if unitId then
 		UnitPlatesScanTool:ClearLines()
 		UnitPlatesScanTool:SetUnit(unitId)
@@ -644,24 +654,19 @@ local function UpdatePlate(self)
 			-- guild = "PET"
 		-- end
 		
-		if scanTextLine2Text and not string.find(scanTextLine2Text, "Level") then
+		--if scanTextLine2Text and not string.find(scanTextLine2Text, "Level") then
+		if not string.find(scanTextLine2Text, "Level") then
 			--local owner, _ = string.split("'",ownerText)
 			guild = scanTextLine2Text
-			--cache in guild
-			if isPlayer then
-				StoreCachePlayerGuild(name, guild)
-			else
-				StoreCacheNPCGuild(name, guild)
-			end
-		end
-	end
-	
-	if not guild then
-		--try to get from cache
-		if isPlayer then
-			guild = RetrieveCachePlayerGuild(name, guild)
 		else
-			guild = RetrieveCacheNPCGuild(name, guild)
+			guild = nil
+		end
+		
+		--cache in guild
+		if isPlayer then
+			StoreCachePlayerGuild(name, guild)
+		else
+			StoreCacheNPCGuild(name, guild)
 		end
 	end
 	
