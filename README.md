@@ -32,6 +32,7 @@ Features:
 - Cast bar
 - Skill uses
 - Debuffs
+- pfquest-epoch nameplate icons compatibility
 - and more
 
 
