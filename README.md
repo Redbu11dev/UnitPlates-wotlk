@@ -9,6 +9,7 @@ Can show if enemy is tapped (after you mouse over or target the enemy)
 TODO LIST:
 
 - unit debuffs are still experimental
+- rewrite unit id acquisition code
 
 ----------------------------------------------------------------------
 
