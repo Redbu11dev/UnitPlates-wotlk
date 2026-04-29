@@ -10,6 +10,7 @@ TODO LIST:
 
 - unit debuffs are still experimental
 - rewrite unit id acquisition code
+- configuration options (but the goal is to not to have many configuration options)
 
 ----------------------------------------------------------------------
 
