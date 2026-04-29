@@ -145,6 +145,30 @@ local chatTextColors = {
 
 ---------------------------CONSTANTS END
 
+--pfquest compatibility
+local PFQUEST_SWORD_ICON = "Interface\\AddOns\\pfQuest-epoch\\img\\slay"
+local PFQUEST_BAG_ICON = "Interface\\AddOns\\pfQuest-epoch\\img\\loot"
+
+local function RepositionPfQuestIcons(nameplateFrame)	
+	local basePlateFrame = nameplateFrame:GetParent() 
+	
+	local children = { basePlateFrame:GetChildren() }
+	for _, child in ipairs(children) do
+        if child.Icon and child.Icon:GetObjectType() == "Texture" then
+            local texture = child.Icon:GetTexture()
+            if texture == PFQUEST_SWORD_ICON or texture == PFQUEST_BAG_ICON then
+                child:SetParent(nameplateFrame)
+				child:ClearAllPoints()
+				child:SetPoint("RIGHT", nameplateFrame.name, "LEFT", minimalOnePixel, minimalOnePixel * 4)
+				child:SetSize(nameFontSize * 2, nameFontSize * 2)
+				return nil
+            end
+        end
+    end
+	return nil
+end
+--
+
 local function UpdateDebuffs(f, unitId)
 
 	if not unitId or not UnitExists(unitId) then 
@@ -552,6 +576,9 @@ local function OnFrameUpdate(self, e)
 	if f.critElap <= 0 then
 		f.critElap = critUpdateTime
 		f:UpdateFrameCritical()
+		--pfquest compatibility
+		RepositionPfQuestIcons(f)
+		--
 	end
 	
 	-- if f.highlighted then
@@ -1004,6 +1031,7 @@ local function UpdatePlate(self)
 	if unitId then
 		if self.debuffUpdateElapsed <= 0 then
 			self.debuffUpdateElapsed = debuffUnitIdUpdateTime
+			print("here")
 			UpdateDebuffs(self, unitId)
 		end
 	end
