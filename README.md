@@ -16,11 +16,9 @@ TODO LIST:
 
 (!) I do not and do not plan to support non-english locales (!)
 
-No configuration is available atm
+Configuration window - /up or /unitplates
 
 (!) This addon is caching a lot of data, so if you want to play on a different realm, it's probably best to remove config file from WTF folder (!)
-
-Configuration window - /up or /unitplates
 
 Features:
 
