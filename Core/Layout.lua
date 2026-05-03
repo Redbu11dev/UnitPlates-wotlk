@@ -2076,10 +2076,19 @@ function addon:InitFrame(frame)
 				end
 				
 				local pct = timeLeftSeconds / self.duration -- 1.0 down to 0.0
+				if pct > 1 then
+					pct = 1 -- Clamp to 100%
+				end
+				if pct < 0 then
+					pct = 0  -- Clamp to 0%
+				end
 				local size = self:GetWidth() / 2 -- Half the icon size (e.g., 18)
 
 				-- Reset state
-				for _, q in pairs(self.quads) do q:Show() q:SetSize(size, size) end
+				for _, q in pairs(self.quads) do
+					q:Show()
+					q:SetSize(size, size) 
+				end
 
 				if pct > 0.75 then
 					-- 100% to 75%: Shrink TOP RIGHT width
@@ -2100,7 +2109,9 @@ function addon:InitFrame(frame)
 					self.quads.BL:Hide()
 					self.quads.TL:SetHeight(size * (pct / 0.25))
 				else
-					for _, q in pairs(self.quads) do q:Hide() end
+					for _, q in pairs(self.quads) do
+						q:Hide()
+					end
 				end
 			end
 		end)
