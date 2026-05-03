@@ -645,6 +645,7 @@ end
 function loadUnitPlatesDefaultSettings()
 	UnitPlatesSettings = {
 		minimapIconPos = 0,
+		smallerAuras = true,
 		showBuffs=true,
 		onlyYourBuffs=false,
 		ignoredBuffNames = "name1,name2",
@@ -662,11 +663,14 @@ function loadUnitPlatesSettings()
 		if UnitPlatesSettings.minimapIconPos == nil then
 			UnitPlatesSettings.minimapIconPos=0
 		end
+		if UnitPlatesSettings.smallerAuras == nil then
+			UnitPlatesSettings.smallerAuras=true
+		end
 		if UnitPlatesSettings.showBuffs == nil then
 			UnitPlatesSettings.showBuffs=true
 		end
 		if UnitPlatesSettings.onlyYourBuffs == nil then
-			UnitPlatesSettings.onlyYourBuffs=true
+			UnitPlatesSettings.onlyYourBuffs=false
 		end
 		if UnitPlatesSettings.ignoredBuffNames == nil then
 			UnitPlatesSettings.ignoredBuffNames="name1,name2"
@@ -675,7 +679,7 @@ function loadUnitPlatesSettings()
 			UnitPlatesSettings.showDebuffs=true
 		end
 		if UnitPlatesSettings.onlyYourDebuffs == nil then
-			UnitPlatesSettings.onlyYourDebuffs=true
+			UnitPlatesSettings.onlyYourDebuffs=false
 		end
 		if UnitPlatesSettings.ignoredDebuffNames == nil then
 			UnitPlatesSettings.ignoredDebuffNames="name1,name2"
@@ -765,8 +769,18 @@ function initUnitPlatesSettings()
 	scrollChild:SetAllPoints(unitPlatesOptionsFrame.scrollFrame)
 	unitPlatesOptionsFrame.scrollFrame:SetScrollChild(scrollChild)
 	
+	local smallerAurasCheckbox = CreateFrame("CheckButton", "smallerAurasCheckbox", scrollChild, "UICheckButtonTemplate")
+	smallerAurasCheckbox:SetPoint("TOPLEFT",8,-24)
+	getglobal(smallerAurasCheckbox:GetName() .. 'Text'):SetText("Smaller auras")
+	smallerAurasCheckbox:SetChecked(UnitPlatesSettings.smallerAuras)
+	smallerAurasCheckbox.tooltip = "Smaller auras"
+	smallerAurasCheckbox:SetScript("OnClick", function()
+		UnitPlatesSettings.smallerAuras=not UnitPlatesSettings.smallerAuras
+		--applyAllSettings()
+	end)
+	
 	local showBuffsCheckbox = CreateFrame("CheckButton", "showBuffsCheckbox", scrollChild, "UICheckButtonTemplate")
-	showBuffsCheckbox:SetPoint("TOPLEFT",8,-24)
+	showBuffsCheckbox:SetPoint("TOP", smallerAurasCheckbox, "BOTTOM", 0, -0)
 	getglobal(showBuffsCheckbox:GetName() .. 'Text'):SetText("Show buffs")
 	showBuffsCheckbox:SetChecked(UnitPlatesSettings.showBuffs)
 	showBuffsCheckbox.tooltip = "Show buffs"

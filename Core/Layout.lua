@@ -153,6 +153,7 @@ local function CreateQuadrant(parent, point)
 end
 
 local function HideAllDebuffs(f)
+	f.unitBuffs = {}
 	for i = 1, maxDebuffs do
         f.debuffContainer.debuffIcons[i]:Hide()
     end
@@ -927,8 +928,8 @@ local function UpdatePlate(self)
 		if polledUnitBuffs then
 			self.unitBuffs = polledUnitBuffs
 		else
-			--we don't know if it's the same nameplate
-			self.unitBuffs = {}
+			--we don't know if it's the same nameplate?
+			--self.unitBuffs = {}
 		end
 	end
 	
@@ -1914,9 +1915,17 @@ function addon:InitFrame(frame)
 			--determine icon size based on active count and max in row
 			
 			if activeUnitBuffCount <= 8 then
-				maxDebuffsInRow = 4
+				if UnitPlatesSettings.smallerAuras then
+					maxDebuffsInRow = 6
+				else
+					maxDebuffsInRow = 4
+				end
 			elseif activeUnitBuffCount <= 16 then
-				maxDebuffsInRow = 5
+				if UnitPlatesSettings.smallerAuras then
+					maxDebuffsInRow = 6
+				else
+					maxDebuffsInRow = 5
+				end
 			elseif activeUnitBuffCount <= 24 then
 				maxDebuffsInRow = 6
 			else
@@ -1951,7 +1960,7 @@ function addon:InitFrame(frame)
 			local yOffset = row * (iconSize + debuffIconOffset)
 			
 			if firstDebuffIndex > 1 then
-				yOffset = (buffrows * (iconSize + debuffIconOffset)) + (row * (iconSize + debuffIconOffset)) + (iconSize * 1.5)
+				yOffset = (buffrows * (iconSize + debuffIconOffset)) + (row * (iconSize + debuffIconOffset)) + (iconSize * 1.3)
 			end
 			
 			icon:SetSize(iconSize, iconSize)
