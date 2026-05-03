@@ -6,6 +6,16 @@ _G.UnitPlates = addon
 local kui = LibStub("Kui-1.0")
 local LSM = LibStub("LibSharedMedia-3.0")
 
+_G.SLASH_UNITPLATES1 = "/unitplates"
+_G.SLASH_UNITPLATES2 = "/up"
+
+function SlashCmdList.UNITPLATES()
+	print("UnitPlates config is not available yet")
+	unitPlatesOptionsFrame:Show()
+end
+
+
+
 UnitPlatesScanTool = CreateFrame( "GameTooltip", "ScanTooltip", nil, "GameTooltipTemplate" )
 UnitPlatesScanTool:SetOwner( WorldFrame, "ANCHOR_NONE" )
 UnitPlatesScanTextLine2 = _G["ScanTooltipTextLeft2"] -- This is the line with <[Player]'s Pet>
@@ -626,6 +636,247 @@ function addon:OnInitialize()
 	-- addon.Castbar = addon:GetModule("Castbar")
 	--addon.TankModule = addon:GetModule("TankMode")
 end
+
+
+
+
+
+
+function loadUnitPlatesDefaultSettings()
+	UnitPlatesSettings = {
+		minimapIconPos = 0,
+		showBuffs=true,
+		onlyYourBuffs=false,
+		ignoredBuffNames = "name1,name2",
+		showDebuffs=true,
+		onlyYourDebuffs=false,
+		ignoredDebuffNames = "name1,name2",
+	}
+end
+
+function loadUnitPlatesSettings() 
+	if UnitPlatesSettings == nil then
+		loadUnitPlatesDefaultSettings()
+		print("unable to load UnitPlates saved data, backing up to defaults")
+	else
+		if UnitPlatesSettings.minimapIconPos == nil then
+			UnitPlatesSettings.minimapIconPos=0
+		end
+		if UnitPlatesSettings.showBuffs == nil then
+			UnitPlatesSettings.showBuffs=true
+		end
+		if UnitPlatesSettings.onlyYourBuffs == nil then
+			UnitPlatesSettings.onlyYourBuffs=true
+		end
+		if UnitPlatesSettings.ignoredBuffNames == nil then
+			UnitPlatesSettings.ignoredBuffNames="name1,name2"
+		end
+		if UnitPlatesSettings.showDebuffs == nil then
+			UnitPlatesSettings.showDebuffs=true
+		end
+		if UnitPlatesSettings.onlyYourDebuffs == nil then
+			UnitPlatesSettings.onlyYourDebuffs=true
+		end
+		if UnitPlatesSettings.ignoredDebuffNames == nil then
+			UnitPlatesSettings.ignoredDebuffNames="name1,name2"
+		end
+		print("UnitPlates saved data loaded")
+	end
+end
+
+unitPlatesOptionsFrame = CreateFrame("Frame", "unitPlatesOptionsFrame", UIParent)
+
+function initUnitPlatesSettings()
+	loadUnitPlatesSettings() 
+
+	unitPlatesOptionsFrame:SetMovable(true)
+	unitPlatesOptionsFrame:EnableMouse(true)
+	
+	unitPlatesOptionsFrame:SetScript("OnMouseDown", function()
+	  if arg1 == "LeftButton" and not unitPlatesOptionsFrame.isMoving then
+	   unitPlatesOptionsFrame:StartMoving()
+	   unitPlatesOptionsFrame.isMoving = true
+	  end
+	end)
+	unitPlatesOptionsFrame:SetScript("OnMouseUp", function()
+	  if arg1 == "LeftButton" and unitPlatesOptionsFrame.isMoving then
+	   unitPlatesOptionsFrame:StopMovingOrSizing()
+	   unitPlatesOptionsFrame.isMoving = false
+	  end
+	end)
+	unitPlatesOptionsFrame:SetScript("OnHide", function()
+	  if ( unitPlatesOptionsFrame.isMoving ) then
+	   unitPlatesOptionsFrame:StopMovingOrSizing()
+	   unitPlatesOptionsFrame.isMoving = false
+	  end
+	end)
+	
+	unitPlatesOptionsFrame:SetWidth(500)
+	unitPlatesOptionsFrame:SetHeight(500)
+	unitPlatesOptionsFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+	
+	unitPlatesOptionsFrame:SetBackdrop({
+		bgFile = "Interface/Tooltips/UI-Tooltip-Background",
+		edgeFile = "Interface/DialogFrame/UI-DialogBox-Border",
+		edgeSize = 12,
+		insets = { left = 2, right = 2, top = 2, bottom = 2 },
+	})
+	unitPlatesOptionsFrame:SetBackdropColor(0,0,0,.5)
+	
+	unitPlatesOptionsFrame.title = unitPlatesOptionsFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	--nameplate.health.text:SetAllPoints()
+	unitPlatesOptionsFrame.title:SetPoint("TOP", unitPlatesOptionsFrame, "TOP", 0, -8)
+	unitPlatesOptionsFrame.title:SetTextColor(1,1,1,barAlpha)
+	unitPlatesOptionsFrame.title:SetFont("Interface\\AddOns\\UnitPlates\\fonts\\francois.ttf", 12, "OUTLINE")
+	unitPlatesOptionsFrame.title:SetJustifyH("LEFT")
+	unitPlatesOptionsFrame.title:SetText("UnitPlates options")
+	
+	local closeButton = CreateFrame("Button", nil, unitPlatesOptionsFrame, "UIPanelButtonTemplate")
+	closeButton:SetPoint("TOPRIGHT",0,0)
+	closeButton:SetWidth(50)
+	closeButton:SetHeight(25)
+	closeButton:SetText("Close")
+	closeButton:SetScript("OnClick", function()
+		unitPlatesOptionsFrame:Hide()
+	end)
+	
+	local setDefaultsButton = CreateFrame("Button", nil, unitPlatesOptionsFrame, "UIPanelButtonTemplate")
+	setDefaultsButton:SetPoint("BOTTOM",0,0)
+	setDefaultsButton:SetWidth(200)
+	setDefaultsButton:SetHeight(40)
+	setDefaultsButton:SetText("Set defaults & Reload")
+	setDefaultsButton:SetScript("OnClick", function()
+		loadUnitPlatesDefaultSettings()
+		ReloadUI()
+	end)
+	
+	-- Create the scrolling parent frame and size it to fit inside the texture
+	unitPlatesOptionsFrame.scrollFrame = CreateFrame("ScrollFrame", "unitPlatesOptionsFrame_ScrollFrame", unitPlatesOptionsFrame, "UIPanelScrollFrameTemplate")
+	unitPlatesOptionsFrame.scrollFrame:SetHeight(unitPlatesOptionsFrame:GetHeight())
+	unitPlatesOptionsFrame.scrollBar = _G[unitPlatesOptionsFrame.scrollFrame:GetName() .. "ScrollBar"]
+    unitPlatesOptionsFrame.scrollFrame:SetWidth(unitPlatesOptionsFrame:GetWidth())
+	unitPlatesOptionsFrame.scrollFrame:SetPoint("TOPLEFT", 10, -30)
+	unitPlatesOptionsFrame.scrollFrame:SetPoint("BOTTOMRIGHT", -30, 50)
+
+	-- Create the scrolling child frame, set its width to fit, and give it an arbitrary minimum height (such as 1)
+	local scrollChild = CreateFrame("Frame", nil, unitPlatesOptionsFrame.scrollFrame)
+	scrollChild:SetWidth(unitPlatesOptionsFrame:GetWidth()-18)
+	scrollChild:SetHeight(1) 
+	scrollChild:SetAllPoints(unitPlatesOptionsFrame.scrollFrame)
+	unitPlatesOptionsFrame.scrollFrame:SetScrollChild(scrollChild)
+	
+	local showBuffsCheckbox = CreateFrame("CheckButton", "showBuffsCheckbox", scrollChild, "UICheckButtonTemplate")
+	showBuffsCheckbox:SetPoint("TOPLEFT",8,-24)
+	getglobal(showBuffsCheckbox:GetName() .. 'Text'):SetText("Show buffs")
+	showBuffsCheckbox:SetChecked(UnitPlatesSettings.showBuffs)
+	showBuffsCheckbox.tooltip = "Show buffs"
+	showBuffsCheckbox:SetScript("OnClick", function()
+		UnitPlatesSettings.showBuffs=not UnitPlatesSettings.showBuffs
+		--applyAllSettings()
+	end)
+	
+	local showOnlyYourBuffsCheckbox = CreateFrame("CheckButton", "showOnlyYourBuffsCheckbox", scrollChild, "UICheckButtonTemplate")
+	showOnlyYourBuffsCheckbox:SetPoint("TOP", showBuffsCheckbox, "BOTTOM", 0, -0)
+	getglobal(showOnlyYourBuffsCheckbox:GetName() .. 'Text'):SetText("Show only your buffs")
+	showOnlyYourBuffsCheckbox:SetChecked(UnitPlatesSettings.onlyYourBuffs)
+	showOnlyYourBuffsCheckbox.tooltip = "Show only your buffs"
+	showOnlyYourBuffsCheckbox:SetScript("OnClick", function()
+		UnitPlatesSettings.onlyYourBuffs=not UnitPlatesSettings.onlyYourBuffs
+		--applyAllSettings()
+	end)
+	
+	local ignoredBuffnamesTitle = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	ignoredBuffnamesTitle:SetPoint("TOPLEFT", showOnlyYourBuffsCheckbox, "BOTTOMLEFT", 0, -4)
+	ignoredBuffnamesTitle:SetTextColor(0.999,0.819,0,barAlpha)
+	ignoredBuffnamesTitle:SetJustifyH("LEFT")
+	ignoredBuffnamesTitle:SetText("Ignore buff names: ")
+	
+	local ignoredBuffnamesInput = CreateFrame("EditBox", nil, scrollChild)
+	ignoredBuffnamesInput:SetBackdrop({
+		bgFile = "Interface/Tooltips/UI-Tooltip-Background",
+		edgeFile = "Interface/DialogFrame/UI-DialogBox-Border",
+		edgeSize = 12,
+		insets = { left = 2, right = 2, top = 2, bottom = 2 },
+	})
+	ignoredBuffnamesInput:SetBackdropColor(0,0,0,.5)
+	ignoredBuffnamesInput:SetTextInsets(5, 5, 5, 5)
+	ignoredBuffnamesInput:SetTextColor(1,1,1,1)
+	ignoredBuffnamesInput:SetJustifyH("LEFT")
+	ignoredBuffnamesInput:SetWidth(280)
+	ignoredBuffnamesInput:SetHeight(26)
+	ignoredBuffnamesInput:SetPoint("LEFT", ignoredBuffnamesTitle, "RIGHT", 0, 0)
+	ignoredBuffnamesInput:SetFontObject("GameFontNormal")
+	ignoredBuffnamesInput:SetAutoFocus(false)
+	ignoredBuffnamesInput:SetText(""..UnitPlatesSettings.ignoredBuffNames)
+	ignoredBuffnamesInput:SetScript("OnTextChanged", function(self)
+		local inputValue = ignoredBuffnamesInput:GetText()
+		if not inputValue then
+			ignoredBuffnamesInput:SetText(""..UnitPlatesSettings.ignoredBuffNames)
+		else
+			UnitPlatesSettings.ignoredBuffNames = inputValue
+			ignoredBuffnamesInput:SetText(""..UnitPlatesSettings.ignoredBuffNames)
+			--applyAllSettings()
+		end
+	end)
+	
+	local showDebuffsCheckbox = CreateFrame("CheckButton", "showDebuffsCheckbox", scrollChild, "UICheckButtonTemplate")
+	showDebuffsCheckbox:SetPoint("TOPLEFT", ignoredBuffnamesTitle, "BOTTOMLEFT", 0, -16)
+	getglobal(showDebuffsCheckbox:GetName() .. 'Text'):SetText("Show debuffs")
+	showDebuffsCheckbox:SetChecked(UnitPlatesSettings.showDebuffs)
+	showDebuffsCheckbox.tooltip = "Show debuffs"
+	showDebuffsCheckbox:SetScript("OnClick", function()
+		UnitPlatesSettings.showDebuffs=not UnitPlatesSettings.showDebuffs
+		--applyAllSettings()
+	end)
+	
+	local showOnlyYourDebuffsCheckbox = CreateFrame("CheckButton", "showOnlyYourDebuffsCheckbox", scrollChild, "UICheckButtonTemplate")
+	showOnlyYourDebuffsCheckbox:SetPoint("TOP", showDebuffsCheckbox, "BOTTOM", 0, -0)
+	getglobal(showOnlyYourDebuffsCheckbox:GetName() .. 'Text'):SetText("Show only your debuffs")
+	showOnlyYourDebuffsCheckbox:SetChecked(UnitPlatesSettings.onlyYourDebuffs)
+	showOnlyYourDebuffsCheckbox.tooltip = "Show only your debuffs"
+	showOnlyYourDebuffsCheckbox:SetScript("OnClick", function()
+		UnitPlatesSettings.onlyYourDebuffs=not UnitPlatesSettings.onlyYourDebuffs
+		--applyAllSettings()
+	end)
+	
+	local ignoredDebuffnamesTitle = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	ignoredDebuffnamesTitle:SetPoint("TOPLEFT", showOnlyYourDebuffsCheckbox, "BOTTOMLEFT", 0, -4)
+	ignoredDebuffnamesTitle:SetTextColor(0.999,0.819,0,barAlpha)
+	ignoredDebuffnamesTitle:SetJustifyH("LEFT")
+	ignoredDebuffnamesTitle:SetText("Ignore debuff names: ")
+	
+	local ignoredDebuffnamesInput = CreateFrame("EditBox", nil, scrollChild)
+	ignoredDebuffnamesInput:SetBackdrop({
+		bgFile = "Interface/Tooltips/UI-Tooltip-Background",
+		edgeFile = "Interface/DialogFrame/UI-DialogBox-Border",
+		edgeSize = 12,
+		insets = { left = 2, right = 2, top = 2, bottom = 2 },
+	})
+	ignoredDebuffnamesInput:SetBackdropColor(0,0,0,.5)
+	ignoredDebuffnamesInput:SetTextInsets(5, 5, 5, 5)
+	ignoredDebuffnamesInput:SetTextColor(1,1,1,1)
+	ignoredDebuffnamesInput:SetJustifyH("LEFT")
+	ignoredDebuffnamesInput:SetWidth(280)
+	ignoredDebuffnamesInput:SetHeight(26)
+	ignoredDebuffnamesInput:SetPoint("LEFT", ignoredDebuffnamesTitle, "RIGHT", 0, 0)
+	ignoredDebuffnamesInput:SetFontObject("GameFontNormal")
+	ignoredDebuffnamesInput:SetAutoFocus(false)
+	ignoredDebuffnamesInput:SetText(""..UnitPlatesSettings.ignoredDebuffNames)
+	ignoredDebuffnamesInput:SetScript("OnTextChanged", function(self)
+		local inputValue = ignoredDebuffnamesInput:GetText()
+		if not inputValue then
+			ignoredDebuffnamesInput:SetText(""..UnitPlatesSettings.ignoredDebuffNames)
+		else
+			UnitPlatesSettings.ignoredDebuffNames = inputValue
+			ignoredDebuffnamesInput:SetText(""..UnitPlatesSettings.ignoredDebuffNames)
+			--applyAllSettings()
+		end
+	end)
+	
+	
+	unitPlatesOptionsFrame:Hide()
+end
+
 ---------------------------------------------------------------------- enable --
 function addon:OnEnable()
 	-- -- force enable threat on nameplates - this is a hidden CVar
@@ -664,4 +915,6 @@ function addon:OnEnable()
 	self:RegisterEvent("UNIT_AURA")
 
 	self:ScheduleRepeatingTimer("OnUpdate", 0.1)
+	
+	initUnitPlatesSettings()
 end

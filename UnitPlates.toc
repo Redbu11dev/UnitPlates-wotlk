@@ -4,6 +4,7 @@
 ## Version: 1
 ## Notes: Best nameplates.
 ## SavedVariables: UnitPlatesPlayersCache, UnitPlatesNPCCache
+## SavedVariablesPerCharacter: UnitPlatesSettings
 ## X-Website: https://github.com/Redbu11dev777
 
 Embeds.xml

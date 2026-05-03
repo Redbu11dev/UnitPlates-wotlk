@@ -20,39 +20,16 @@
     -- end
 -- end)
 
-local totemIcons = {
-  ["Disease Cleansing Totem"] = "spell_nature_diseasecleansingtotem",
-  ["Earth Elemental Totem"] = "spell_nature_earthelemental_totem",
-  ["Earthbind Totem"] = "spell_nature_strengthofearthtotem02",
-  ["Fire Elemental Totem"] = "spell_fire_elemental_totem",
-  ["Fire Nova Totem"] = "spell_fire_sealoffire",
-  ["Fire Resistance Totem"] = "spell_fireresistancetotem_01",
-  ["Flametongue Totem"] = "spell_nature_guardianward",
-  ["Frost Resistance Totem"] = "spell_frostresistancetotem_01",
-  ["Grace of Air Totem"] = "spell_nature_invisibilitytotem",
-  ["Grounding Totem"] = "spell_nature_groundingtotem",
-  ["Healing Stream Totem"] = "Inv_spear_04",
-  ["Magma Totem"] = "spell_fire_selfdestruct",
-  ["Mana Spring Totem"] = "spell_nature_manaregentotem",
-  ["Mana Tide Totem"] = "spell_frost_summonwaterelemental",
-  ["Nature Resistance Totem"] = "spell_nature_natureresistancetotem",
-  ["Poison Cleansing Totem"] = "spell_nature_poisoncleansingtotem",
-  ["Searing Totem"] = "spell_fire_searingtotem",
-  ["Sentry Totem"] = "spell_nature_removecurse",
-  ["Stoneclaw Totem"] = "spell_nature_stoneclawtotem",
-  ["Stoneskin Totem"] = "spell_nature_stoneskintotem",
-  ["Strength of Earth Totem"] = "spell_nature_earthbindtotem",
-  ["Totem of Wrath"] = "spell_fire_totemofwrath",
-  ["Tremor Totem"] = "spell_nature_tremortotem",
-  ["Windfury Totem"] = "spell_nature_windfury",
-  ["Windwall Totem"] = "spell_nature_earthbind",
-  ["Wrath of Air Totem"] = "spell_nature_slowingtotem"
-}
-
-local function IsTotemPlate(name)
-	for totem, icon in pairs(totemIcons) do
-		if string.find(name, totem) then return icon end
-	end
+local function trimString(s)
+  local l = 1
+  while strsub(s,l,l) == ' ' do
+    l = l+1
+  end
+  local r = strlen(s)
+  while strsub(s,r,r) == ' ' do
+    r = r-1
+  end
+  return strsub(s,l,r)
 end
 
 ---------------------------CONSTANTS
@@ -90,12 +67,9 @@ local raidIconSize = nameplateHealthBarHeight * 3.125
 local threatFrameSize = nameplateHealthBarHeight
 local threatFontSize = nameplateHealthBarHeight * 0.5
 
-local maxDebuffs = 15
+local maxDebuffs = 80
 local maxDebuffsInRow = 5
-local maxDebuffsInRowGrayLevel = 3
 local debuffIconOffset = 0.1 * minimalOnePixel
-local debuffIconSize = (nameplateHealthBarWidth / maxDebuffsInRow) - debuffIconOffset
-local debuffIconSizeGrayLevel = (nameplateWidthGrayLevel / maxDebuffsInRowGrayLevel) - debuffIconOffset
 
 local castBarSizes = {
 	cbheight = nameplateHealthBarHeight * 0.3125,
@@ -169,122 +143,20 @@ local function RepositionPfQuestIcons(nameplateFrame)
 end
 --
 
-local function UpdateDebuffs(f, unitId)
-
-	if not unitId or not UnitExists(unitId) then 
-        HideAllDebuffs(f) -- Clear icons if we can't scan
-        return 
-    end
-
-	-- for i = 1, 15 do
-        -- f.debuffContainer.debuffs[i]:Hide()
-    -- end
-
-    local iconIndex = 1
-    
-    -- 1. Loop through all debuffs on the unit
-    for i = 1, 40 do
-        local name, _, texture, count, _, duration, expirationTime, unitCaster = UnitDebuff(unitId, i)
-		
-		---------------------------DEBUG
-		
-		-- name = "test"
-		-- --texture = "Interface\\AddOns\\UnitPlates\\img\\loading.tga"
-		-- local keys = {}
-		-- for name in pairs(totemIcons) do
-			-- table.insert(keys, name)
-		-- end
-
-		-- -- 2. Pick a random key from that list
-		-- local randomKey = keys[math.random(#keys)]
-
-		-- -- 3. Access the value
-		-- local randomValue = totemIcons[randomKey]
-		-- texture = "Interface\\Icons\\" .. randomValue
-		-- count = i
-		-- duration = i+10
-		-- expirationTime = GetTime() + duration
-		
-		---------------------------DEBUG END
-		
-		
-        
-        -- Stop if no more debuffs OR if we ran out of our 15 icons
-        if not name or iconIndex > maxDebuffs then
-			break 
-		end
-
-        -- Optional: Filter for only player debuffs
-        --if unitCaster == "player" then
-            local icon = f.debuffContainer.debuffs[iconIndex]
-            
-            -- Set Texture
-            icon.tex:SetTexture(texture)
-            
-            -- Set Count
-            if count and count > 1 then
-                icon.count:SetText(count)
-                icon.count:Show()
-            else
-                icon.count:Hide()
-            end
-            
-            -- Set Cooldown Spiral
-            if duration and duration > 0 then
-                icon.cd:SetCooldown(expirationTime - duration, duration)
-				icon.expiration = expirationTime
-				icon.duration = duration
-                icon.cd:Show()
-            else
-				icon.cd:SetCooldown(0, 0)
-				icon.expiration = 0
-				icon.duration = 0
-                icon.cd:Hide()
-            end
-            
-			-- Position the icon dynamically
-			local maxInRow = maxDebuffsInRow
-			local iconSize = debuffIconSize
-			if f.isGrayLevel or f.isPet then
-				maxInRow = maxDebuffsInRowGrayLevel
-				iconSize = debuffIconSizeGrayLevel
-			end
-			
-			local column = (iconIndex - 1) % maxInRow          -- Results in 0, 1, 2, 3
-			local row = math.floor((iconIndex - 1) / maxInRow) -- Results in 0, 1, 2...
-			
-			local xOffset = column * (iconSize + debuffIconOffset)
-			local yOffset = row * (iconSize + debuffIconOffset)
-			icon:SetSize(debuffIconSize, debuffIconSize)
-			
-			icon:ClearAllPoints()
-			-- We use BOTTOMLEFT so that as 'row' increases, icons move UP (on top)
-			icon:SetPoint("BOTTOMLEFT", f.debuffContainer, "BOTTOMLEFT", xOffset, yOffset)
-			
-            
-            -- local xOffset = (iconIndex - 1) * (debuffIconSize + debuffIconOffset)
-			-- local yOffset = 0
-            -- icon:ClearAllPoints()
-            -- icon:SetPoint("BOTTOMLEFT", f.debuffContainer, "BOTTOMLEFT", xOffset, yOffset)
-            
-            icon:Show()
-            iconIndex = iconIndex + 1
-        --end
-    end
-    
-    -- 2. Hide any remaining icons in our pool that aren't being used
-    for i = iconIndex, maxDebuffs do
-        f.debuffContainer.debuffs[i]:Hide()
-    end
+local function CreateQuadrant(parent, point)
+    local tex = parent:CreateTexture(nil, "OVERLAY")
+    tex:SetTexture("Interface\\Buttons\\WHITE8X8")
+    tex:SetVertexColor(0, 0, 0, 0.6) -- Semi-transparent black
+    tex:SetSize(parent:GetWidth()/2, parent:GetHeight()/2)
+    tex:SetPoint(point, parent, point)
+    return tex
 end
 
 local function HideAllDebuffs(f)
 	for i = 1, maxDebuffs do
-        f.debuffContainer.debuffs[i]:Hide()
+        f.debuffContainer.debuffIcons[i]:Hide()
     end
 end
-
-
 
 
 local kui = LibStub("Kui-1.0")
@@ -993,7 +865,7 @@ local function UpdatePlate(self)
 	end
 	
 	--TOTEM
-	local totemIcon = IsTotemPlate(name)
+	local totemIcon = UpApiIsTotemPlate(name)
 	if totemIcon then
 		self:GetParent().totem.icon:SetTexture("Interface\\Icons\\" .. totemIcon)
 		local totemR,totemG,totemB,totemA = self.health:GetStatusBarColor()
@@ -1027,12 +899,36 @@ local function UpdatePlate(self)
 		self.threat.text:Hide()
 	end
 	
-	--DEBUFFS
-	if unitId then
-		if self.debuffUpdateElapsed <= 0 then
-			self.debuffUpdateElapsed = debuffUnitIdUpdateTime
-			--print("here")
-			UpdateDebuffs(self, unitId)
+	--THIS IS DEBUFF POLLING
+	if self.debuffUpdateElapsed <= 0 then
+		self.debuffUpdateElapsed = debuffUnitIdUpdateTime
+		--print("here")
+		
+		ignoredBuffNames = {}
+		for word in string.gmatch(UnitPlatesSettings.ignoredBuffNames, '([^,]+)') do
+			table.insert(ignoredBuffNames, trimString(word))
+		end
+		
+		ignoredDebuffNames = {}
+		for word in string.gmatch(UnitPlatesSettings.ignoredBuffNames, '([^,]+)') do
+			table.insert(ignoredDebuffNames, trimString(word))
+		end
+		
+		
+		local polledUnitBuffs = UpApiGetUnitAuras(
+			unitId,
+			UnitPlatesSettings.showBuffs,
+			UnitPlatesSettings.onlyYourBuffs,
+			UnitPlatesSettings.showDebuffs,
+			UnitPlatesSettings.onlyYourDebuffs,
+			ignoredBuffNames,
+			ignoredDebuffNames
+		)
+		if polledUnitBuffs then
+			self.unitBuffs = polledUnitBuffs
+		else
+			--we don't know if it's the same nameplate
+			self.unitBuffs = {}
 		end
 	end
 	
@@ -1942,120 +1838,269 @@ function addon:InitFrame(frame)
 	--totem END
 	
 	--debuffs
+	f.unitBuffs = {}
+	
 	f.debuffContainer = CreateFrame("Frame", nil, f)
-	f.debuffContainer:SetPoint("BOTTOM", f.name, "TOP", 0, 0)
+	f.debuffContainer:SetPoint("BOTTOM", f.name, "TOP", 0, nameplateClassIconSize / 2)
 	f.debuffContainer:SetHeight(nameplateHealthBarHeight)
 	f.debuffContainer:SetWidth(nameplateHealthBarWidth)
+	--debuff onupdate
 	f.debuffContainer:SetScript("OnUpdate", function(self, elapsed)
 		self.nextUpdate = (self.nextUpdate or 0) - elapsed
 		if self.nextUpdate > 0 then return end
 		self.nextUpdate = 0.1 
 		
-		local f = self:GetParent() -- Reference the nameplate
+		--THIS IS DEBUFF FRAMES UPDATE
+		
 		local currentTime = GetTime()
-		local needsShift = false
 		
-		-- 1. First Pass: Update Timers and Detect Expirations
-		for i = 1, maxDebuffs do
-			local icon = self.debuffs[i]
-			if icon:IsShown() and icon.expiration then
-				local timeLeft = icon.expiration - currentTime
-				
-				if timeLeft <= 0 then
-					-- This icon expired!
-					icon.expiration = nil
-					icon.duration = nil
-					
-					if f.unitId and UnitExists(f.unitId) then
-						-- Scenario A: Valid Unit, just redraw everything and stop
-						UpdateDebuffs(f, f.unitId)
-						return 
-					else
-						-- Scenario B: No Unit, mark for manual shift
-						icon:Hide()
-						needsShift = true
-					end
-				else
-					-- -- Update your custom timer text here
-					-- if timeLeft < 5 then
-						-- icon.timerText:SetText(string.format("%.1f", timeLeft))
-					-- else
-						-- icon.timerText:SetText(math.floor(timeLeft))
-					-- end
-				end
+		-- Safely remove expired debuffs by iterating backwards
+		for i = table.getn(f.unitBuffs), 1, -1 do
+			local debuff = f.unitBuffs[i]
+			-- Check if it has an expiration time and if that time has passed
+			local timeLeftSeconds = debuff.expirationTime - currentTime
+			if timeLeftSeconds <= 0 then
+				table.remove(f.unitBuffs, i)
 			end
 		end
+		--
 		
-		-- 2. Second Pass: Manual Shift (Only if an icon expired in Scenario B)
-		if needsShift then
-			for i = 1, maxDebuffs - 1 do
-				local currentIcon = self.debuffs[i]
-				-- If this slot is now empty, try to pull from the next slot
-				if not currentIcon:IsShown() then
-					local nextIcon = self.debuffs[i+1]
-					if nextIcon:IsShown() then
-						-- Copy data
-						currentIcon.tex:SetTexture(nextIcon.tex:GetTexture())
-						currentIcon.expiration = nextIcon.expiration
-						currentIcon.duration = nextIcon.duration
-						
-						local countText = nextIcon.count:GetText()
-						currentIcon.count:SetText(countText or "")
-						if countText and countText ~= "" then currentIcon.count:Show() else currentIcon.count:Hide() end
-						
-						-- Restart Spiral
-						if currentIcon.expiration and currentIcon.duration then
-							currentIcon.cd:SetCooldown(currentIcon.expiration - currentIcon.duration, currentIcon.duration)
-							currentIcon.cd:Show()
-						end
-
-						currentIcon:Show()
-						
-						-- Clear the source
-						nextIcon.expiration = nil
-						nextIcon:Hide()
-					end
-				end
+		local activeUnitBuffCount = table.getn(f.unitBuffs)
+		
+		local hasDebuffRow = false
+		local firstDebuffIndex = 1
+		local firstDebuffRow = 1
+		local buffrows = 0
+		local lastBuffYOffset = 0
+		local hadAnyBuffs = false
+		
+		--iterating through stored list
+		local iconIndex = 1    
+		for _, debuff in ipairs(f.unitBuffs) do
+			local name = debuff.name
+			local texture = debuff.texture
+			local count = debuff.count
+			local duration = debuff.duration
+			local expirationTime = debuff.expirationTime
+			
+			-- Stop if no more debuffs OR if we ran out of our MAX icons
+			if not name or iconIndex > maxDebuffs then
+				break 
 			end
+			
+			--setup icon
+			local icon = f.debuffContainer.debuffIcons[iconIndex]
+			
+			icon.isDebuff = debuff.isDebuff
+			
+			-- Set Texture
+			icon.tex:SetTexture(texture)
+			
+			--set count
+			icon.count = count
+			
+			-- Set Cooldown
+			if duration > 0 then
+				icon.expirationTime = expirationTime
+				icon.duration = duration
+				icon.startTime = expirationTime - duration
+			else
+				icon.expirationTime = 0
+				icon.duration = 0
+				icon.startTime = 0
+			end
+			
+			-- Position the icon dynamically
+			--determine icon size based on active count and max in row
+			
+			if activeUnitBuffCount <= 8 then
+				maxDebuffsInRow = 4
+			elseif activeUnitBuffCount <= 16 then
+				maxDebuffsInRow = 5
+			elseif activeUnitBuffCount <= 24 then
+				maxDebuffsInRow = 6
+			else
+				maxDebuffsInRow = 7
+			end
+			
+			
+			local iconSize = (nameplateHealthBarWidth / maxDebuffsInRow) - debuffIconOffset
+			if f.isGrayLevel or f.isPet then
+				iconSize = (nameplateWidthGrayLevel / maxDebuffsInRow) - debuffIconOffset
+			end
+			
+			local column = (iconIndex - 1) % maxDebuffsInRow          -- Results in 0, 1, 2, 3
+			local row = math.floor((iconIndex - 1) / maxDebuffsInRow) -- Results in 0, 1, 2...
+			
+			if not debuff.isDebuff then
+				hadAnyBuffs = true
+			end
+			if hadAnyBuffs and debuff.isDebuff and firstDebuffIndex == 1 then
+				buffrows = (math.floor((iconIndex - 1 - 1) / maxDebuffsInRow))
+				firstDebuffIndex = iconIndex
+				firstDebuffRow = row
+			end
+			
+			if firstDebuffIndex > 1 then
+				-- row = row + 1
+				column = (iconIndex - firstDebuffIndex) % maxDebuffsInRow
+				row = math.floor((iconIndex - firstDebuffIndex) / maxDebuffsInRow)
+			end
+			
+			local xOffset = column * (iconSize + debuffIconOffset)
+			local yOffset = row * (iconSize + debuffIconOffset)
+			
+			if firstDebuffIndex > 1 then
+				yOffset = (buffrows * (iconSize + debuffIconOffset)) + (row * (iconSize + debuffIconOffset)) + (iconSize * 1.5)
+			end
+			
+			icon:SetSize(iconSize, iconSize)
+			local timeLeftSeconds = debuff.expirationTime - currentTime
+			if timeLeftSeconds >= 60 then
+				icon.cdText:SetFont("Fonts\\FRIZQT__.TTF", iconSize/2.6, "OUTLINE")
+			else
+				icon.cdText:SetFont("Fonts\\FRIZQT__.TTF", iconSize/2, "OUTLINE")
+			end
+			icon.countText:SetFont("Interface\\AddOns\\UnitPlates\\fonts\\francois.ttf", iconSize/3, "OUTLINE")
+			
+			icon:ClearAllPoints()
+			-- We use BOTTOMLEFT so that as 'row' increases, icons move UP (on top)
+			icon:SetPoint("BOTTOMLEFT", f.debuffContainer, "BOTTOMLEFT", xOffset, yOffset)
+			
+			icon:Show()
+			iconIndex = iconIndex + 1
 		end
 		
+		--Hide any remaining icons in our pool that aren't being used
+		for i = iconIndex, maxDebuffs do
+			f.debuffContainer.debuffIcons[i]:Hide()
+		end
 	end)
+	--debuff onupdate end
 	
-	f.debuffContainer.debuffs = {} -- Table to hold our icon frames
-	--f.debuffContainer:SetFrameStrata("TOOLTIP")
-	
-	for i = 1, maxDebuffs do
-		-- f.debuffContainer.icon1 = f.typeIcon:CreateTexture(nil, "OVERLAY")
-		-- f.debuffContainer.icon1:SetTexture("Interface\\AddOns\\UnitPlates\\img\\loading.tga")
-		-- f.debuffContainer.icon1:SetSize(debuffIconSize, debuffIconSize)
-		
-		-- f.debuffContainer.icon1:SetPoint("BOTTOMLEFT", f.debuffContainer, "BOTTOMLEFT", 0, 0)
-		
+	--create icons
+	f.debuffContainer.debuffIcons = {} -- Table to hold our icon frames
+	--f.debuffContainer:SetFrameStrata("TOOLTIP")	
+	for i = 1, maxDebuffs do		
 		local icon = CreateFrame("Frame", nil, f.debuffContainer)
-		icon:SetSize(debuffIconSize, debuffIconSize)
+		icon:SetSize(16, 16)
 		icon:SetFrameLevel(1)
 		
-		-- 1. The Actual Texture
 		icon.tex = icon:CreateTexture(nil, "BACKGROUND")
 		icon.tex:SetTexture("Interface\\AddOns\\UnitPlates\\img\\loading.tga")
 		icon.tex:SetAllPoints(icon)
 		--icon.tex:SetFrameLevel(0)
 		
-		-- 2. The Stack Count (e.g., Sunder Armor x5)
-		icon.count = icon:CreateFontString(nil, "OVERLAY", "SubSpellFont")
-		icon.count:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 2, 0)
-		icon.count:SetFont("Interface\\AddOns\\UnitPlates\\fonts\\francois.ttf", powerFontSize, "OUTLINE")
-		icon.count:SetTextColor(1,1,1,1)
+		icon.countText = icon:CreateFontString(nil, "OVERLAY", "SubSpellFont")
+		icon.countText:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 2, 0)
+		icon.countText:SetFont("Interface\\AddOns\\UnitPlates\\fonts\\francois.ttf", powerFontSize, "OUTLINE")
+		icon.countText:SetTextColor(1,1,1,1)
 		
-		-- 3. The Cooldown Spiral (Requires a specific frame type)
-		icon.cd = CreateFrame("Cooldown", nil, icon, "CooldownFrameTemplate")
-		icon.cd:SetAllPoints(icon)
-		icon.cd:SetReverse(true)
-		icon.cd:SetFrameLevel(10)
+		icon.cdText = icon:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		icon.cdText:SetPoint("CENTER", icon, "CENTER", 0, 0)
+		icon.cdText:SetFont("Interface\\AddOns\\UnitPlates\\fonts\\francois.ttf", levelFontSize, "OUTLINE")
+		icon.cdText:SetTextColor(1,1,1,1)
+		
+		icon.quads = {
+			TR = CreateQuadrant(icon, "TOPRIGHT"),
+			BR = CreateQuadrant(icon, "BOTTOMRIGHT"),
+			BL = CreateQuadrant(icon, "BOTTOMLEFT"),
+			TL = CreateQuadrant(icon, "TOPLEFT"),
+		}
+		
+		icon:SetScript("OnUpdate", function(self, elapsed)
+			if self:IsShown() then
+				self.nextUpdate = (self.nextUpdate or 0) - elapsed
+				if self.nextUpdate > 0 then return end
+				self.nextUpdate = 0.1 
+				
+				--count
+				if self.count and self.count > 0 then
+					self.countText:SetText(""..self.count)
+				else
+					self.countText:SetText("")
+				end
+				
+				--time left
+				local timeLeftSeconds = self.expirationTime-GetTime()
+				if timeLeftSeconds > 0 then
+					local cooldownText = ""..timeLeftSeconds
+					if timeLeftSeconds >= 60*60 then
+						cooldownText = math.floor(timeLeftSeconds / 3600) .. "h"
+						if self.isDebuff then
+							self.cdText:SetTextColor(0.70, 0.30, 1.0, 1.0)
+						else
+							self.cdText:SetTextColor(0.53,0.81,0.98,1)
+						end
+					elseif timeLeftSeconds >= 60 then
+						cooldownText = math.floor(timeLeftSeconds / 60) .. "m"
+						if self.isDebuff then
+							self.cdText:SetTextColor(0.70, 0.30, 1.0, 1.0)
+						else
+							self.cdText:SetTextColor(0.53,0.81,0.98,1)
+						end
+					elseif timeLeftSeconds >= 1 then
+						cooldownText = math.floor(timeLeftSeconds) .. ""
+						if self.isDebuff then
+							self.cdText:SetTextColor(1,0.8,0.8,1)
+						else
+							self.cdText:SetTextColor(0.8,0.8,1,1)
+						end
+						if timeLeftSeconds <= 3 then
+							self.cdText:SetTextColor(0.99,0,0,1)
+						elseif timeLeftSeconds <= 7 then
+							self.cdText:SetTextColor(0.99,0.99,0,1)
+						end
+					elseif timeLeftSeconds > 0 then
+						local s = string.format("%.1f", timeLeftSeconds)
+						--cooldownText = string.gsub(s, "^0", "")
+						cooldownText = string.sub(s, 2)
+						self.cdText:SetTextColor(0.99,0,0,1)
+					else
+						cooldownText = "0"
+						self.cdText:SetTextColor(0.99,0,0,1)
+					end
+					
+					self.cdText:SetText(cooldownText)--show
+				else
+					self.cdText:SetText("0")--show
+				end
+				
+				local pct = timeLeftSeconds / self.duration -- 1.0 down to 0.0
+				local size = self:GetWidth() / 2 -- Half the icon size (e.g., 18)
 
+				-- Reset state
+				for _, q in pairs(self.quads) do q:Show() q:SetSize(size, size) end
+
+				if pct > 0.75 then
+					-- 100% to 75%: Shrink TOP RIGHT width
+					self.quads.TR:SetWidth(size * ((pct - 0.75) / 0.25))
+				elseif pct > 0.50 then
+					-- 75% to 50%: TR is gone, shrink BOTTOM RIGHT height
+					self.quads.TR:Hide()
+					self.quads.BR:SetHeight(size * ((pct - 0.50) / 0.25))
+				elseif pct > 0.25 then
+					-- 50% to 25%: TR/BR gone, shrink BOTTOM LEFT width
+					self.quads.TR:Hide()
+					self.quads.BR:Hide()
+					self.quads.BL:SetWidth(size * ((pct - 0.25) / 0.25))
+				elseif pct > 0 then
+					-- 25% to 0%: Only TL left, shrink TOP LEFT height
+					self.quads.TR:Hide()
+					self.quads.BR:Hide()
+					self.quads.BL:Hide()
+					self.quads.TL:SetHeight(size * (pct / 0.25))
+				else
+					for _, q in pairs(self.quads) do q:Hide() end
+				end
+			end
+		end)
+
+		icon.expirationTime = 0
+		icon.duration = 0
+		icon.startTime = 0
 		icon:Hide() -- Hide by default
-		-- Inside your icon creation loop
-		f.debuffContainer.debuffs[i] = icon -- Store in our pool
+		f.debuffContainer.debuffIcons[i] = icon -- Store in our pool
 	end
 	--debuffs END
 
@@ -2312,13 +2357,13 @@ function addon:UNIT_AURA(event, arg1, arg2)
 	-- print(""..arg1)
 	-- print(""..tostring(arg2))
 	--arg1 is unitId
-	if arg1 then
-		--update debuffs
-		-- print("try get plate")
-		local plate = addon:GetUnitPlate(arg1)
-		if plate then
-		-- print("has plate")
-			UpdateDebuffs(plate, arg1)
-		end
-	end
+	-- if arg1 then
+		-- --update debuffs
+		-- -- print("try get plate")
+		-- local plate = addon:GetUnitPlate(arg1)
+		-- if plate then
+		-- -- print("has plate")
+			-- UpdateDebuffs(plate, arg1)
+		-- end
+	-- end
 end
