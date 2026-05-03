@@ -20,6 +20,8 @@ No configuration is available atm
 
 (!) This addon is caching a lot of data, so if you want to play on a different realm, it's probably best to remove config file from WTF folder (!)
 
+Configuration window - /up or /unitplates
+
 Features:
 
 - Power bars (mana, rage, energy) for nameplates
