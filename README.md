@@ -2,6 +2,8 @@
 
 A new version of https://github.com/Redbu11dev/ShaguPlates-extra for 3.3.5 (works with epoch), but this time is completely rebuilt on top of KUI nameplates (most of the original code is rewritten)
 
+Once I rewrite all the kui code, I will also make a version of this compatible with octowow (or 1.12)
+
 Still a work in progress though, so might be bugged here and there, but already works alright
 
 Can show if enemy is tapped (after you mouse over or target the enemy)
