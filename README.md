@@ -12,7 +12,7 @@ TODO LIST:
 
 - unit auras are still experimental
 - rewrite unit id acquisition code
-- configuration options (but the goal is to not to have many configuration options)
+- more configuration options (but the goal is to not to have many configuration options)
 
 ----------------------------------------------------------------------
 
