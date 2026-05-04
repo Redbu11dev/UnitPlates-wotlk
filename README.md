@@ -34,7 +34,7 @@ Features:
 - Combo points
 - Cast bar
 - Skill uses
-- Debuffs
+- Buffs/Debuffs (auras)
 - pfquest-epoch nameplate icons compatibility
 - and more
 
