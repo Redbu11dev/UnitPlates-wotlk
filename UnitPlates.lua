@@ -1,0 +1,2220 @@
+local UnitPlatesMainFrame = CreateFrame("Frame", "UnitPlatesMainFrame", UIParent)
+UnitPlatesMainFrame:SetFrameStrata("LOW")
+UnitPlatesMainFrame.TimeToCheck = 0
+UnitPlatesMainFrame.numFrames = 0
+
+local addonIsLoaded = false
+local playerEnteredWorld = false
+
+---------------------------CONSTANTS
+
+local spellSchoolColors = {
+	[1] = {a = 1.00, r = 1.00, g = 1.00, b = 0.00}, -- Physical
+	[2] = {a = 1.00, r = 1.00, g = 0.90, b = 0.50}, -- Holy
+	[4] = {a = 1.00, r = 1.00, g = 0.50, b = 0.00}, -- Fire
+	[8] = {a = 1.00, r = 0.30, g = 1.00, b = 0.30}, -- Nature
+	[16] = {a = 1.00, r = 0.50, g = 1.00, b = 1.00}, -- Frost
+	[20] = {a = 1.00, r = 0.50, g = 1.00, b = 1.00}, -- Frostfire
+	[32] = {a = 1.00, r = 0.50, g = 0.50, b = 1.00}, -- Shadow
+	[64] = {a = 1.00, r = 1.00, g = 0.50, b = 1.00} -- Arcane
+}
+
+local function getClassPos(class)
+	if(class=="WARRIOR") then return 0,    0.25,    0,	0.25;	end
+	if(class=="MAGE")    then return 0.25, 0.5,     0,	0.25;	end
+	if(class=="ROGUE")   then return 0.5,  0.75,    0,	0.25;	end
+	if(class=="DRUID")   then return 0.75, 1,       0,	0.25;	end
+	if(class=="HUNTER")  then return 0,    0.25,    0.25,	0.5;	end
+	if(class=="SHAMAN")  then return 0.25, 0.5,     0.25,	0.5;	end
+	if(class=="PRIEST")  then return 0.5,  0.75,    0.25,	0.5;	end
+	if(class=="WARLOCK") then return 0.75, 1,       0.25,	0.5;	end
+	if(class=="PALADIN") then return 0,    0.25,    0.5,	0.75;	end
+	return 0.25, 0.5, 0.5, 0.75	-- Returns empty next one, so blank
+end
+
+local slowUpdateTime, critUpdateTime, debuffUnitIdUpdateTime = 0.01, 0.1, 0.1
+
+--SIZES
+--make all sizes relative to nameplateHealthBarHeight
+local nameplateHealthBarHeight = 14
+
+local minimalOnePixel = nameplateHealthBarHeight / 16
+
+local nameplateHealthBarWidth = nameplateHealthBarHeight * 7.1875
+local nameplateWidthGrayLevel = nameplateHealthBarHeight * 4.6875
+local nameplatePowerBarHeight = nameplateHealthBarHeight / 2
+
+local nameFontSize = nameplateHealthBarHeight * 0.6875
+local healthPercentageFontSize = nameplateHealthBarHeight * 0.625
+local healthBigFontSize = nameplateHealthBarHeight * 0.625
+--local healthSmallFontSize = nameplateHealthBarHeight * 0.5
+local powerFontSize = nameplateHealthBarHeight * 0.5
+local levelFontSize = nameplateHealthBarHeight * 0.625
+local castWarningNameFontSize = nameplateHealthBarHeight * 0.6875
+local castWarningDurationFontSize = nameplateHealthBarHeight * 0.5
+
+local nameplateArrowSize = nameplateHealthBarHeight * 1.875
+local nameplateRarityH = nameplateHealthBarHeight * 2.75
+local nameplateRarityW = nameplateHealthBarHeight * 2.625
+
+local combatIconSize = nameplateHealthBarHeight * 1.4
+
+local nameplateTypeIconSize = nameplateHealthBarHeight
+local nameplateClassIconSize = nameplateHealthBarHeight * 1.25
+
+local raidIconSize = nameplateHealthBarHeight * 3.125
+
+local threatFrameSize = nameplateHealthBarHeight
+local threatFontSize = nameplateHealthBarHeight * 0.5
+
+local maxDebuffs = 80
+local maxDebuffsInRow = 5
+local debuffIconOffset = 0.1 * minimalOnePixel
+
+local castBarSizes = {
+	cbheight = nameplateHealthBarHeight * 0.3125,
+	shield = nameplateHealthBarHeight,
+	icon = nameplateHealthBarHeight
+ }
+
+local combopointsSizes = {
+	combopoints = nameplateHealthBarHeight * 0.5625,
+	spacing = minimalOnePixel
+}
+
+local totemIconSize = nameplateHealthBarHeight * 2.5
+
+--OFFSETS
+local nameplateRarityXOffset = nameplateRarityW * 0.619
+
+--COLORS
+local glowColor = {.3, 0.7, 1, 1}
+local hatedColor = {.7, 0.2, 0.1}
+local neutralColor = {1, 0.8, 0}
+local friendlyColor = {.2, 0.6, 0.1}
+local tappedColor = {0.2352941176470588, 0.2274509803921569, 0.2352941176470588}
+local playerColor = {.2, 0.5, 0.9}
+
+local castBarColor = {.43, 0.47, 0.55, 1}
+local castBarShieldColor = {.8, 0.1, 0.1, 1}
+
+local combopointsColors = {
+	full = {1, 0.224, 0.027}
+}
+
+local powerBarColors = {
+	mana = {0, 0, 0.9, 0.99999779462814},
+	energy = {1, 1, 0, 0.99999779462814},
+	rage = {1, 0, 0, 0.99999779462814},
+	rageDim = {0.5, 0, 0, 0.99999779462814}
+}
+
+local chatTextColors = {
+    ["CHAT_MSG_SAY"] = {1.0, 1.0, 1.0, 0.99}, -- White
+    ["CHAT_MSG_PARTY"] = {0.67, 0.67, 1.0, 0.99}, -- Light Blue
+    ["CHAT_MSG_YELL"] = {1.0, 0.25, 0.25, 0.99}, -- Bright Red
+    ["CHAT_MSG_MONSTER_SAY"] = {1.0, 1.0, 0.6, 0.99}, -- Pale Yellow
+    ["CHAT_MSG_MONSTER_YELL"] = {1.0, 0.48, 0.0, 0.99}, -- Orange-Gold (Distinct from Say)
+}
+
+---------------------------CONSTANTS END
+
+--pfquest compatibility
+local PFQUEST_SWORD_ICON = "Interface\\AddOns\\pfQuest-epoch\\img\\slay"
+local PFQUEST_BAG_ICON = "Interface\\AddOns\\pfQuest-epoch\\img\\loot"
+local function RepositionPfQuestIcons(nameplateFrame)	
+	local basePlateFrame = nameplateFrame:GetParent() 
+	
+	local children = { basePlateFrame:GetChildren() }
+	for _, child in ipairs(children) do
+        if child.Icon and child.Icon:GetObjectType() == "Texture" then
+            local texture = child.Icon:GetTexture()
+            if texture == PFQUEST_SWORD_ICON or texture == PFQUEST_BAG_ICON then
+                child:SetParent(nameplateFrame)
+				child:ClearAllPoints()
+				child:SetPoint("RIGHT", nameplateFrame.name, "LEFT", minimalOnePixel, minimalOnePixel * 4)
+				child:SetSize(nameFontSize * 2, nameFontSize * 2)
+				return nil
+            end
+        end
+    end
+	return nil
+end
+--pfquest compatibility END
+
+--debuff
+local function HideAllDebuffs(f)
+	f.unitBuffs = {}
+	for i = 1, maxDebuffs do
+        f.debuffContainer.debuffIcons[i]:Hide()
+    end
+end
+
+------------------------------------------------------------- Frame functions --
+--required to set frame positions
+local function SetFrameCenter(f)
+	-- using CENTER breaks pixel-perfectness with oddly sized frames
+	-- .. so we have to align frames manually.
+	local w, h = f:GetSize()
+
+	if f.trivial then
+		f.x = math.floor((w / 2) - (nameplateWidthGrayLevel / 2))
+		f.y = math.floor((h / 2) - (nameplateHealthBarHeight / 2))
+	else
+		f.x = math.floor((w / 2) - (nameplateHealthBarWidth / 2))
+		f.y = math.floor((h / 2) - (nameplateHealthBarHeight / 2))
+	end
+end
+
+
+
+-- get default health bar color, parse it into one of our custom colors
+-- and the reaction of the unit toward the player
+local function SetHealthColor(self, sticky, r, g, b)
+	if sticky == false then
+		-- unstick and reset
+		self.health.reset = true
+		self.healthColourPriority = nil
+		sticky = nil
+	elseif sticky == true then
+		-- convert legacy stickiness
+		sticky = 1
+	end
+	-- nil sticky = just update health colour
+
+	if sticky then
+		if not self.healthColourPriority or sticky >= self.healthColourPriority then
+			self.health:SetStatusBarColor(r, g, b)
+			self.healthColourPriority = sticky
+		end
+		return
+	end
+
+	-- update health colour from default (r,g,b arguments are ignored)
+	--local origR, origG, origB = self.oldHealth:GetStatusBarColor()
+	r, g, b = self.oldHealth:GetStatusBarColor()
+	if self.health.reset or r ~= self.health.r or g ~= self.health.g or b ~= self.health.b then
+		-- store the default colour
+		self.health.r, self.health.g, self.health.b = r, g, b
+		self.health.reset, self.player, self.tapped = nil, nil, nil
+
+		if g > 0.9 and r == 0 and b == 0 then
+			-- friendly NPC
+			self.friend = true
+			r, g, b = unpack(friendlyColor)
+		elseif b > 0.9 and r == 0 and g == 0 then
+			-- friendly player
+			self.friend = true
+			self.player = true
+			r, g, b = unpack(playerColor)
+		elseif r > 0.9 and g == 0 and b == 0 then
+			-- enemy NPC
+			self.friend = nil
+			r, g, b = unpack(hatedColor)
+		elseif (r + g) > 1.8 and b == 0 then
+			-- neutral NPC
+			self.friend = nil
+			r, g, b = unpack(neutralColor)
+		--elseif UnitIsTapped(self.guid) then
+		elseif r < 0.6 and (r + g) == (r + b) then
+			-- tapped NPC
+			-- keep previous self.friend value
+			self.tapped = true
+			r, g, b = unpack(tappedColor)
+		else
+			-- enemy player, use default UI colour
+			self.friend = nil
+			self.player = true
+		end
+
+		self.health:SetStatusBarColor(r, g, b)
+	end
+	
+	-------------------------------------------
+	-- --NOTE: WORKS INCORRECTLY WHEN YOU HAVE A PET/MINION WHICH ATTACKS FIRST
+	-- --additional tapped check hack (inaccurate isTapped check for unscanned nameplate)
+	-- local oldNameColorR, oldNameColorG, oldNameColorB, oldNameColorA = self.oldName:GetTextColor()
+	-- --print(self.oldName:GetTextColor())
+	-- local isAggro = false
+	-- if ((oldNameColorR > 0.99) and (oldNameColorG == 0) and (oldNameColorB == 0)) then
+		-- isAggro = true
+	-- end
+	-- if (isAggro and (not self.player) and (not self.friend) and (not UnitAffectingCombat("player")) and (GetNumPartyMembers() < 1)) then
+		-- self.tapped = true
+		-- r, g, b = unpack(tappedColor)
+		-- self.health:SetStatusBarColor(r, g, b)
+	-- else
+		-- --not tapped
+		-- self.tapped = false
+		-- --gotta set normal color?
+	-- end
+	-------------------------------------------
+	
+	if self.guid then
+		local unitId = UPCoreGetUnitIDFromGUID(self.guid)
+		if unitId then
+			--if UnitIsTapped(unitId) then
+			if UnitIsTapped(unitId) and not (UnitIsTappedByPlayer(unitId) or UnitIsTappedByAllThreatList(unitId)) then
+				--print("----------name3: "..unitId)
+				-- tapped NPC
+				-- keep previous self.friend value
+				self.tapped = true
+				r, g, b = unpack(tappedColor)
+				self.health:SetStatusBarColor(r, g, b)
+			else
+				--not tapped
+				self.tapped = false
+				--gotta set normal color?
+			end
+		end
+	end
+end
+---------------------------------------------------- Update health bar & text --
+local OnHealthValueChanged
+do
+	OnHealthValueChanged = function(frame, curval)
+		frame.health.min, frame.health.max = frame.oldHealth:GetMinMaxValues()
+		frame.health.curr = curval or frame.oldHealth:GetValue()
+		frame.health.percent = 100 * frame.health.curr / frame.health.max
+
+		frame.health:SetMinMaxValues(frame.health.min, frame.health.max)
+		frame.health:SetValue(frame.health.curr)
+
+		frame.health.p:SetText(UPCoreNum(frame.health.curr))
+	end
+end
+
+------------------------------------------------------- Frame script handlers --
+local function OnFrameShow(self)
+	local f = self.kui
+	
+	f:SetSize(self:GetWidth(), self:GetHeight())
+	if not f.doneFirstShow then
+		f:SetFrameCenter()
+		f.doneFirstShow = true
+	end
+	-- run updates immediately after the frame is shown
+	f.elapsed = 0
+	f.critElap = 0
+	f.debuffUpdateElapsed = 0
+	-- dispatch the PostShow message after the first Update Frame
+	f.DispatchPostShow = true
+	f.DoShow = true
+	HideAllDebuffs(f)
+	UPCoreFrameFadeRemoveFrame(f.castWarning)
+	f.castWarning:Hide()
+	UPCoreFrameFadeRemoveFrame(f.chatBubble)
+	f.chatBubble:Hide()
+	f.guid = nil
+end
+
+local function OnFrameHide(self)
+	local f = self.kui
+	f:Hide()
+
+	f:SetFrameLevel(0)
+	f.glow:Hide() 
+	f.glow2:Hide()
+	--f.active = nil
+	f.lastAlpha = nil
+	f.fadingTo = nil
+	f.hasThreat = nil
+	f.target = nil
+	f.targetDelay = nil
+	f.healthColourPriority = nil
+	-- force un-highlight
+	--OnFrameLeave(f)
+	f.highlighted = nil
+	-- ResetCastBarFade(f)
+	UPCoreFrameFadeRemoveFrame(f.castWarning)
+	f.castWarning:Hide()
+	--also reset chat bubble?
+	UPCoreFrameFadeRemoveFrame(f.chatBubble)
+	f.chatBubble:Hide()
+	f.castbar_ignore_frame = nil
+	-- despite being a default element, this doesn't hide correctly if it was
+	-- shown when the frame is hidden
+	f.glow:Hide()
+	-- unset stored health bar colours
+	f.health.r, f.health.g, f.health.b, f.health.reset = nil, nil, nil, nil
+	f.friend = nil
+	HideAllDebuffs(f)
+	f.guid = nil
+	-- addon:SendMessage("UnitPlates_PostHide", f)
+end
+
+local function UpdatePlate(self)
+	--reset values
+	--local isPlayer = false
+	local isInParty = false
+	self.guild:SetText("")
+	--
+	
+	--name
+	local name = self.oldName:GetText()
+	--
+	
+	if UnitIsPlayer(self.oldName:GetText()) then
+		isInParty = true
+	end
+	local isPlayer = self.player
+	if not self.guid then
+		self.guid = UPCoreGetGuidForName(name)
+		--self.guid = UnitGUID(unitId)
+	end
+	if not guid then
+		if UnitExists("target") and (self.defaultAlpha == 1) and (UnitName("target") == name) then
+			local newguid = UnitGUID("target")
+			if newguid then
+				self.guid = newguid
+				if isPlayer then
+					--store guid
+					UPCoreStoreGuidForName(name, self.guid)
+				end
+			end
+		end
+	end
+	if not guid then
+		if UnitExists("mouseover") then
+			if isPlayer and (UnitName("mouseover") == name) then
+				local newguid = UnitGUID("mouseover")
+				if newguid then
+					self.guid = newguid
+					--store guid
+					UPCoreStoreGuidForName(name, self.guid)
+				end
+			elseif self.oldHighlight:IsShown() then
+				local newguid = UnitGUID("mouseover")
+				if newguid then
+					self.guid = newguid
+				end
+			end
+		end
+	end
+	local guid = self.guid
+	if guid and isPlayer then
+		UPCoreStoreGuidForName(name, guid)
+	end
+	local unitId = UPCoreGetUnitIDFromGUID(guid)
+	if unitId then
+		self.unitId = unitId
+	else
+		self.unitId = nil
+	end
+	if not unitId then
+		--try to see if it is player and has same name in your party or raid
+		if UnitName("pet") == name then
+			unitId = "pet"
+			--also store guid?
+			local newguid = UnitGUID(unitId)
+			if newguid then
+				guid = newguid
+			end
+		end
+		
+		--hacky unitId check for pets and party members
+		local unitIdFromName = UPCoreGetUnitIDFromName(name)
+		if isPlayer and unitIdFromName then
+			unitId = unitIdFromName
+			local newguid = UnitGUID(unitId)
+			if newguid then
+				guid = newguid
+			end
+		end
+		--hacky guid check for pets and party members END
+	end
+	local levelDifficultyColor = GetQuestDifficultyColor(self.oldLevel:GetText())
+	local isGrayLevel = levelDifficultyColor.r == 0.5 and levelDifficultyColor.g == 0.5 and levelDifficultyColor.b == 0.5
+	self.isGrayLevel = isGrayLevel
+	
+	local isInCombat = false
+	if unitId then
+		if UnitAffectingCombat(unitId) then
+			isInCombat = true
+		end
+	else
+		local thrR, thrG, thrB, thrA = self.oldName:GetTextColor()
+		if thrR > 0.99 and thrG == 0 and thrB == 0 then
+			isInCombat = true
+		end
+	end
+	
+	--
+	--name debug
+	--self.name:SetTextColor(self.oldName:GetTextColor())
+	if guid then
+		self.name:SetText(self.oldName:GetText().." / "..guid)
+		if unitId then
+			self.name:SetText(self.oldName:GetText().." / "..guid.." / "..unitId)
+		end
+	end
+	--
+	
+	--get guild
+	local guild = nil
+	
+	if not guild then
+		--try to get from cache
+		if isPlayer then
+			guild = RetrieveCachePlayerGuild(name, guild)
+		else
+			guild = RetrieveCacheNPCGuild(name, guild)
+		end
+	end
+	
+	if unitId then
+		UnitPlatesScanTool:ClearLines()
+		UnitPlatesScanTool:SetUnit(unitId)
+		local scanTextLine2Text = UnitPlatesScanTextLine2:GetText()
+		--if not ownerText then return nil end
+		--local owner, _ = string.split("'",ownerText)
+		
+		-- if (unitstr ~= nil) and UnitIsPossessed(unitstr) then
+			-- guild = "PET"
+		-- end
+		
+		--if scanTextLine2Text and not string.find(scanTextLine2Text, "Level") then
+		if not string.find(scanTextLine2Text, "Level") then
+			--local owner, _ = string.split("'",ownerText)
+			guild = scanTextLine2Text
+		else
+			guild = nil
+		end
+		
+		--cache in guild
+		if isPlayer then
+			StoreCachePlayerGuild(name, guild)
+		else
+			StoreCacheNPCGuild(name, guild)
+		end
+	end
+	
+	if guild then
+		self.guild:SetText("<"..guild..">")
+	else
+		--empty
+		self.guild:SetText("")
+	end
+	--get guild end
+	
+	-----------------------------------
+	local isPet = false	
+	if guild and (guild:match("'s Pet$") or guild:match("'s Minion$")) then
+		isPet = true
+	end
+	self.isPet = isPet
+	-----------------------------------
+	
+	
+	-----COMMON
+	--(BOTH PLAYERS AND NPC)
+	
+	--combat icon
+	if isInCombat then
+		self.combatIcon:Show()
+	else
+		self.combatIcon:Hide()
+	end
+	--
+	
+	--healthbar with
+	if isGrayLevel or isPet then
+		self.trivial = true
+		if not UnitAffectingCombat("player") then
+			--can't call this while in combat
+			self.oldFrame:SetSize(nameplateWidthGrayLevel, nameplateHealthBarHeight)
+		end
+		self:SetFrameCenter()
+		self.health:SetSize(nameplateWidthGrayLevel, nameplateHealthBarHeight)
+		self.health:SetPoint("BOTTOMLEFT", self.x, self.y)
+		self.power:SetWidth(nameplateWidthGrayLevel)
+		self.castWarning.bar:SetWidth(nameplateWidthGrayLevel)
+		self.debuffContainer:SetWidth(nameplateWidthGrayLevel)
+	else
+		self.trivial = false
+		if not UnitAffectingCombat("player") then
+			--can't call this while in combat
+			self.oldFrame:SetSize(nameplateHealthBarWidth, nameplateHealthBarHeight)
+		end
+		self:SetFrameCenter()
+		self.health:SetSize(nameplateHealthBarWidth, nameplateHealthBarHeight)
+		self.health:SetPoint("BOTTOMLEFT", self.x, self.y)
+		self.power:SetWidth(nameplateHealthBarWidth)
+		self.castWarning.bar:SetWidth(nameplateHealthBarWidth)
+		self.debuffContainer:SetWidth(nameplateHealthBarWidth)
+	end
+	
+	--level and rarity shenanigans
+	self.oldLevel:Hide()
+	-- addon:UpdateLevel(self, false)
+	-- classifications
+	self.level:SetText(self.oldLevel:GetText())
+	self.level:SetTextColor(self.oldLevel:GetTextColor())
+	if self.state:IsVisible() then
+		if self.state:GetTexture() == "Interface\\Tooltips\\EliteNameplateIcon" then
+			--f.level:SetText(f.level:GetText() .. "+")--elite
+			self.rarityIcon:Show()
+			self.rarityIconR:Show()
+		else
+			--f.level:SetText(f.level:GetText() .. "r")--rare
+			self.rarityIcon:Show()
+			self.rarityIconR:Show()
+		end
+
+		-- self.state:Hide()
+	else
+		self.rarityIcon:Hide()
+		self.rarityIconR:Hide()
+	end	
+	
+	if self.boss:IsVisible() then
+		self.level:SetText("??")
+		self.level:SetTextColor(1, 0.2, 0.2)
+
+		self.rarityIcon:Hide()
+		self.rarityIconR:Hide()
+	end
+	--f.level:SetWidth(0)
+	self.level:Show()
+	if self.state:IsVisible() then
+		-- hide the elite/rare dragon
+		-- self.state:Hide()
+	end
+	
+	--update name position
+	if (self.guild:GetText() == nil or self.guild:GetText() == '') then
+		self.name:SetPoint("BOTTOM", self.health, "TOP", 0, 2 * minimalOnePixel)
+	else
+		self.name:SetPoint("BOTTOM", self.guild, "TOP", 0, 2 * minimalOnePixel)
+	end
+	
+	--get power
+	UpdateUnitPower(self, unitId)
+	
+	--get health percentage
+	local hpPercent = math.floor(self.health.percent)
+	if hpPercent < 100 then
+		self.health.percentage:SetText(math.floor(self.health.percent).."%")
+	else
+		self.health.percentage:SetText("")
+	end
+	
+	-----COMMON END
+	
+	if isPlayer then
+		self.rarityIcon:Hide()
+		self.rarityIconR:Hide()
+	
+		local locClass, engClass, locRace, engRace, gender, xname, server
+		if isInParty then
+			locClass, engClass, locRace, engRace, gender, xname, server = GetPlayerInfoByGUID(UnitGUID(name))
+			--cache in locClass, engClass, locRace, engRace, gender, name, server
+			if engClass then
+				StoreCachePlayerInfo(name, engClass, engRace, gender)
+			end
+			
+			--if in party, then we can also pull mana/energy etc
+			--get power
+			UpdateUnitPower(self, unitId)
+		elseif guid then
+			locClass, engClass, locRace, engRace, gender, xname, server = GetPlayerInfoByGUID(guid)
+			--cache in locClass, engClass, locRace, engRace, gender, name, server
+			if engClass then
+				StoreCachePlayerInfo(name, engClass, engRace, gender)
+			end
+		else
+			--no guid, try from cache
+			engClass, engRace, gender = RetrieveCachePlayerInfo(name)
+		end
+		
+		--set class
+		if engClass then
+			local classr, classl, classt, classb = getClassPos(string.upper(engClass))
+			self.classIcon.icon:SetTexCoord(classr, classl, classt, classb)
+			self.classIcon:Show()
+		else
+			--empty
+			self.classIcon:Hide()
+		end
+		
+		--set gender icon
+		if gender and engRace then
+			if gender == 3 then
+				self.typeIcon.icon:SetTexture("Interface\\AddOns\\UnitPlates\\img\\races\\"..string.lower(engRace).."_female.tga")
+			else
+				self.typeIcon.icon:SetTexture("Interface\\AddOns\\UnitPlates\\img\\races\\"..string.lower(engRace).."_male.tga")
+			end
+		else
+			--empty
+			self.typeIcon.icon:SetTexture("Interface\\AddOns\\UnitPlates\\img\\loading.tga")
+		end
+		
+	else
+		--is npc
+		self.classIcon:Hide()		
+		
+		--set creature type
+		local creatureType = nil
+		if unitId then
+			creatureType = UnitCreatureType(unitId)
+			--most probably just an unknown type
+			if (unitId and (not creatureType)) then
+				creatureType = "UNKNOWN"
+			end
+			--cache in creature type
+			if creatureType then
+				StoreCacheNPCCreatureType(name, creatureType)
+			end
+		end
+		
+		if not creatureType then
+			--try by name from cache
+			creatureType = RetrieveCacheNPCCreatureType(name)
+		end
+		
+		if creatureType then
+			--print("creatureType: "..creatureType)
+			local success = self.typeIcon.icon:SetTexture("Interface\\AddOns\\UnitPlates\\img\\creaturetypes\\"..string.upper(creatureType)..".tga")
+			if not success then
+				local success = self.typeIcon.icon:SetTexture("Interface\\AddOns\\UnitPlates\\img\\creaturetypes\\UNKNOWN.tga")
+			end
+		else
+			--empty
+			self.typeIcon.icon:SetTexture("Interface\\AddOns\\UnitPlates\\img\\loading.tga")
+		end
+	end
+	
+	--combo points update
+	if unitId == "target" then
+		self.combopoints.points = GetComboPoints("player", unitId)
+		if not self.combopoints.points or self.combopoints.points < 1 then
+			self.combopoints:Hide()
+		else
+			self.combopoints.color = combopointsColors.full
+			for i = 1, 5 do
+				if i <= self.combopoints.points then
+					self.combopoints[i]:SetAlpha(1)
+				else
+					self.combopoints[i]:SetAlpha(.3)
+				end
+				self.combopoints[i]:SetVertexColor(unpack(self.combopoints.color))
+			end
+			self.combopoints:Show()
+		end
+	else
+		self.combopoints.points = nil
+		self.combopoints:Hide()
+	end
+	--combo points update end
+	
+	--cast warning bar simulation
+	local currTimeMillis = GetTime()*1000
+	if unitId then
+		local spellName, spellNameSecondary, spellDisplayName, spellIcon, spellStartTimeMillis, spellEndTimeMillis, spellIsTradeSkill, spellCastID, spellInterrupt = UnitCastingInfo(unitId)
+		if (spellName and ((spellEndTimeMillis - currTimeMillis) > 0)) then
+			-- print("spellName: "..spellName)
+			-- print("spellNameSecondary: "..spellNameSecondary)
+			-- print("spellDisplayName: "..spellDisplayName)
+			-- print("spellIcon: "..spellIcon)
+			-- print("spellStartTimeMillis: "..spellStartTimeMillis)
+			-- print("spellEndTimeMillis: "..spellEndTimeMillis)
+			-- print("spellIsTradeSkill: ".."boolean")
+			-- print("spellCastID: "..spellCastID)
+			-- print("spellInterrupt: ".."boolean")
+			
+			--something is being cast
+			self.castWarning.currentValue = spellEndTimeMillis - currTimeMillis
+			self.castWarning.startTime = spellStartTimeMillis
+			self.castWarning.endTime = spellEndTimeMillis
+			self.castWarning.castTime = self.castWarning.endTime-self.castWarning.startTime
+			
+			-- print("unitId startTime raw: "..spellStartTimeMillis)
+			-- print("unitId endTime raw: "..spellEndTimeMillis)
+			
+			self.castWarning.curr:SetText(string.format("%.1f", self.castWarning.currentValue/1000))
+			self.castWarning.bar:SetMinMaxValues(0, self.castWarning.castTime)
+			self.castWarning.bar:SetValue(self.castWarning.castTime-self.castWarning.currentValue)
+			
+			if not spellInterrupt then
+				self.castWarning.bar:SetStatusBarColor(unpack(castBarColor))	
+				self.castWarning.shield:Hide()
+			else
+				self.castWarning.bar:SetStatusBarColor(unpack(castBarShieldColor))
+				self.castWarning.shield:Show()
+			end
+			
+			self.castWarning:Show()
+			-- print("unitID castTime: "..self.castWarning.castTime.." / ".."current: "..self.castWarning.castTime-self.castWarning.currentValue)
+		else
+			--assume nothing is being cast
+			self.castWarning.startTime = 0
+			self.castWarning.endTime = 0
+			
+			if self.castWarning.endTime > currTimeMillis then
+				self.castWarning.currentValue = self.castWarning.endTime - currTimeMillis
+				
+				self.castWarning.curr:SetText(string.format("%.1f", self.castWarning.currentValue/1000))
+				self.castWarning.bar:SetMinMaxValues(0, self.castWarning.castTime)
+				self.castWarning.bar:SetValue(self.castWarning.castTime-self.castWarning.currentValue)
+				
+				self.castWarning.bar:SetStatusBarColor(unpack(castBarColor))	
+				self.castWarning.shield:Hide()
+			end
+			if (self.castWarning:IsShown() and (self.castWarning.castTime > 0) and (currTimeMillis > self.castWarning.endTime)) then
+				self.castWarning.castTime = 0
+				self.castWarning:Hide()
+			end
+		end
+	else
+		if self.castWarning.endTime > currTimeMillis then
+			self.castWarning.currentValue = self.castWarning.endTime - currTimeMillis
+			
+			self.castWarning.curr:SetText(string.format("%.1f", self.castWarning.currentValue/1000))
+			self.castWarning.bar:SetMinMaxValues(0, self.castWarning.castTime)
+			self.castWarning.bar:SetValue(self.castWarning.castTime-self.castWarning.currentValue)
+			
+			self.castWarning.bar:SetStatusBarColor(unpack(castBarColor))	
+			self.castWarning.shield:Hide()
+			
+			-- print("normal castTime: "..self.castWarning.castTime.." / ".."current: "..self.castWarning.castTime-self.castWarning.currentValue)
+		end
+		if (self.castWarning:IsShown() and (self.castWarning.castTime > 0) and (currTimeMillis > self.castWarning.endTime)) then
+			self.castWarning.castTime = 0
+			self.castWarning:Hide()
+		end
+	end
+	
+	--TOTEM
+	local totemIcon = UpApiIsTotemPlate(name)
+	if totemIcon then
+		self:GetParent().totem.icon:SetTexture("Interface\\Icons\\" .. totemIcon)
+		local totemR,totemG,totemB,totemA = self.health:GetStatusBarColor()
+		self:GetParent().totem:SetBackdropColor(totemR,totemG,totemB,totemA)
+		self:GetParent().totem:SetBackdropBorderColor(totemR,totemG,totemB,totemA)
+		self:GetParent().totem:Show()
+		self:Hide()
+	else
+		self:GetParent().totem:Hide()
+		self:Show()
+	end
+	
+	--THREAT
+	if (unitId and (not self.friend)) then
+		local isTanking, status, threatpct, rawthreatpct, threatvalue = UnitDetailedThreatSituation("player", unitId)
+		if threatpct then
+			local p = threatpct / 100
+        
+			-- Interpolate: StartValue + (EndValue - StartValue) * Ratio
+			local r = 0.2 + (0.7 - 0.2) * p
+			local g = 0.6 + (0.2 - 0.6) * p
+			local b = 0.1 -- Both start and end at 0.1		
+		
+			self.threat.text:SetTextColor(r, g, b, 1)
+			self.threat.text:SetText(string.format("%d", threatpct).."%")
+			self.threat.text:Show()
+		else
+			self.threat.text:Hide()
+		end
+	else
+		self.threat.text:Hide()
+	end
+	
+	--THIS IS DEBUFF POLLING
+	if self.debuffUpdateElapsed <= 0 then
+		self.debuffUpdateElapsed = debuffUnitIdUpdateTime
+		--print("here")
+		
+		ignoredBuffNames = {}
+		for word in string.gmatch(UnitPlatesSettings.ignoredBuffNames, '([^,]+)') do
+			table.insert(ignoredBuffNames, UPCoreTrimString(word))
+		end
+		
+		ignoredDebuffNames = {}
+		for word in string.gmatch(UnitPlatesSettings.ignoredBuffNames, '([^,]+)') do
+			table.insert(ignoredDebuffNames, UPCoreTrimString(word))
+		end
+		
+		--print("here")
+		local polledUnitBuffs = UpApiGetUnitAuras(
+			unitId,
+			UnitPlatesSettings.showBuffs,
+			UnitPlatesSettings.onlyYourBuffs,
+			UnitPlatesSettings.showDebuffs,
+			UnitPlatesSettings.onlyYourDebuffs,
+			ignoredBuffNames,
+			ignoredDebuffNames
+		)
+		if polledUnitBuffs then
+			self.unitBuffs = polledUnitBuffs
+		else
+			--we don't know if it's the same nameplate?
+			--self.unitBuffs = {}
+		end
+	end
+	
+	-- name colors
+	self.name:SetTextColor(1,1,1,1)
+	self.guild:SetTextColor(1,1,1,1)
+	
+	local myGuildName, myGuildRankName, myGuildRankIndex = GetGuildInfo("player")
+	if (myGuildName and isPlayer and (guild == myGuildName)) then
+		self.guild:SetTextColor(0,0.999,0,1)
+	end
+	
+	if self.highlighted then
+		self:SetFrameStrata("LOW")
+		self.name:SetTextColor(1,1,0,1)
+		self.guild:SetTextColor(1,1,0,1)
+	else
+		self:SetFrameStrata("BACKGROUND")
+		-- self.name:SetTextColor(1,1,0,1)
+		-- self.guild:SetTextColor(1,1,0,1)
+	end
+	
+	---if everything fails then try from cache
+end
+
+function UpdateUnitPower(self, unitId)
+	if unitId then
+		local unitPowerType = UnitPowerType(unitId)
+		local unitMaxPower = UnitPowerMax(unitId, unitPowerType)
+		if unitMaxPower > 0 then
+			local unitPower = UnitPower(unitId, unitPowerType)
+			-- print("----------unitPowerType: "..unitPowerType)
+			-- print("----------unitMaxPower: "..unitMaxPower)
+			-- print("----------unitPower: "..unitPower)
+			self.power.text:SetText(string.format("%s", UPCoreAbbreviate(unitPower)))
+		
+			if unitPowerType == 0 then
+				self.power:SetStatusBarColor(unpack(powerBarColors.mana))
+			elseif unitPowerType == 1 then
+				self.power:SetStatusBarColor(unpack(powerBarColors.rage))
+			elseif unitPowerType == 2 or unitPowerType == 3 then
+				self.power:SetStatusBarColor(unpack(powerBarColors.energy))
+			else
+				self.power:SetStatusBarColor(unpack(powerBarColors.energy))
+			end
+			
+			self.power:SetMinMaxValues(0, unitMaxPower)
+			
+			if unitPowerType == 1 and unitPower < 1 then
+				self.power:SetValue(unitMaxPower)
+				self.power:SetStatusBarColor(unpack(powerBarColors.rageDim))
+			else
+				self.power:SetValue(unitPower)
+			end
+			self.power:Show()
+		else
+			self.power:Hide()
+		end
+	else
+		self.power:Hide()
+	end
+end
+
+-- stuff that can be updated less often
+-- local function UpdateFrame(self)
+	-- -- periodically update the name in order to purge Unknowns due to lag, etc
+	-- --set name
+	-- self.name:SetText(self.oldName:GetText())
+
+	-- -- reset/update health bar colour
+	-- self:SetHealthColor()
+	-- if self.DispatchPostShow then
+		-- -- force initial health update, which relies on health colour
+		-- self:OnHealthValueChanged()
+		-- self.DispatchPostShow = nil
+	-- end
+	
+	-- UpdatePlate(self)
+-- end
+
+-- stuff that needs to be updated every frame
+local function OnFrameUpdate(self, e)
+	local f = self.kui
+	f.elapsed = f.elapsed - e
+	f.critElap = f.critElap - e
+	f.debuffUpdateElapsed = f.debuffUpdateElapsed - e
+
+	-- Show during first update to prevent flashyness
+	-- .DoShow is set OnFrameShow
+	if f.DoShow then
+		f:Show()
+		f.DoShow = nil
+	end
+	------------------------------------------------------------------- Alpha --
+	f.defaultAlpha = self:GetAlpha()
+	f.currentAlpha = 1
+	------------------------------------------------------------------ Fading --
+	
+	f:SetAlpha(f.currentAlpha)
+
+	-- call delayed updates
+	if f.elapsed <= 0 then
+		f.elapsed = slowUpdateTime
+		--UpdateFrame(f)
+		-- periodically update the name in order to purge Unknowns due to lag, etc
+		--set name
+		f.name:SetText(f.oldName:GetText())
+
+		-- reset/update health bar colour
+		f:SetHealthColor()
+		if f.DispatchPostShow then
+			-- force initial health update, which relies on health colour
+			f:OnHealthValueChanged()
+			f.DispatchPostShow = nil
+		end
+		
+		UpdatePlate(f)
+	end
+
+	if f.critElap <= 0 then
+		f.critElap = critUpdateTime
+		
+		if f.unitId == "target" then
+			f:SetFrameLevel(3)
+		else
+			f:SetFrameLevel(0)
+		end
+		
+		------Mouseover		
+		if f.oldHighlight:IsShown() then
+			if not f.highlighted then
+				--OnFrameEnter(f)
+				f.highlighted = true
+				f.guid = UnitGUID("mouseover")
+			end
+		elseif f.highlighted then
+			--OnFrameLeave(f)
+			f.highlighted = nil
+		end
+		
+		--pfquest compatibility
+		RepositionPfQuestIcons(f)
+		--
+	end
+	
+	-- if f.highlighted then
+		-- if UnitCanAttack("player", "mouseover") then
+			-- --print("can attack")
+			-- SetCursor("ATTACK_CURSOR")
+		-- end
+	-- end
+	if MouseIsOver(f.health) or MouseIsOver(f.typeIcon) then
+		if UnitCanAttack("player", "mouseover") then
+			--print("can attack")
+			SetCursor("ATTACK_CURSOR")
+			--set right click attack action?
+		end
+		if (UnitGUID("target") == f.guid) and UnitCanAttack("player", "target") then
+			--print("can attack")
+			SetCursor("ATTACK_CURSOR")
+			--set right click attack action?
+		end
+	end
+end
+
+local function updateCustomBalloonText(f, text, r, g, b, a)
+	-- if f.chatBubble.font:GetText() == text then
+		-- return nil
+	-- end
+
+	f.chatBubble:Show()
+	local minHeight = 20
+
+	local minWidth = 50
+	local maxWidth = 300
+	f.chatBubble.fontMeasure:SetText(text)
+
+	f.chatBubble.font:SetText(text)
+	f.chatBubble.font:SetTextColor(r, g, b, a)
+	
+	local maxOfMin = math.max(minWidth, f.chatBubble.fontMeasure:GetWidth())
+	f.chatBubble.font:SetWidth(math.min(maxOfMin, maxWidth))
+	
+	f.chatBubble:SetWidth(f.chatBubble.font:GetWidth() + 48)
+	f.chatBubble:SetHeight(math.max(f.chatBubble.font:GetHeight(), minHeight) + 32)
+	
+	UPCoreFadeCastWarningFrame(f.chatBubble, 1, 0, 10)
+end
+
+-----------PLATE CREATION
+local function InitFrame(frame)
+	-- container for kui objects!
+	-- frame.kui = CreateFrame("Frame", nil, profile.general.compatibility and frame or WorldFrame)
+	
+	frame.kui = CreateFrame("Frame", nil, frame)
+	local f = frame.kui
+
+	f.fontObjects = {}
+
+	-- fetch default ui's objects
+	local healthBar, castBar = frame:GetChildren()
+	local glowRegion, overlayRegion, castbarOverlay, shieldedRegion, spellIconRegion, highlightRegion, nameTextRegion, levelTextRegion, bossIconRegion, raidIconRegion, stateIconRegion = frame:GetRegions()
+
+	overlayRegion:SetTexture(nil)
+	highlightRegion:SetTexture(nil)
+	--bossIconRegion:SetTexture(nil)
+	shieldedRegion:SetTexture(nil)
+	castbarOverlay:SetTexture(nil)
+	glowRegion:SetTexture(nil)
+	spellIconRegion:SetSize(0.01, 0.01)
+
+	--overlayRegion:Hide()
+	castbarOverlay:Hide()
+
+	healthBar:Hide()
+	nameTextRegion:Hide()
+
+	-- re-hidden OnFrameShow
+	--bossIconRegion:Hide()
+	bossIconRegion:SetSize(0.01, 0.01)
+	--stateIconRegion:Hide()
+	stateIconRegion:SetSize(0.01, 0.01)
+
+	-- make default healthbar & castbar transparent
+	castBar:SetStatusBarTexture("Interface\\AddOns\\UnitPlates\\Media\\t\\empty")
+	healthBar:SetStatusBarTexture("Interface\\AddOns\\UnitPlates\\Media\\t\\empty")
+
+	f.glow = glowRegion
+	f.boss = bossIconRegion
+	f.state = stateIconRegion
+	f.oldLevel = levelTextRegion
+	f.icon = raidIconRegion
+	f.spell = spellIconRegion
+	f.shield = shieldedRegion
+	f.oldHealth = healthBar
+	f.oldCastbar = castBar
+	f.oldOverlayRegion = overlayRegion
+	f.oldFrame = frame
+
+	f.oldName = nameTextRegion
+	f.oldName:Hide()
+
+	f.oldHighlight = highlightRegion
+	
+	--f.oldCastbar
+
+	--------------------------------------------------------- Frame functions --
+	f.SetHealthColor = SetHealthColor
+	f.SetFrameCenter = SetFrameCenter
+	f.OnHealthValueChanged = OnHealthValueChanged
+
+	------------------------------------------------------------------ Layout --	
+	f:SetPoint("CENTER", frame, "CENTER")
+	f:SetFrameStrata("BACKGROUND")
+	f:SetFrameLevel(0)
+	f:SetFrameCenter()
+	
+	-- self:CreateHealthBar(frame, f)
+	f.health = CreateFrame("StatusBar", nil, f)
+	f.health:SetFrameLevel(1)
+	f.health:SetStatusBarTexture("Interface\\AddOns\\UnitPlates\\img\\statusbar\\XPerl_StatusBar4")
+	f.health.percent = 100
+	f.health:GetStatusBarTexture():SetDrawLayer("ARTWORK", -8)
+	-- if self.SetValueSmooth then
+		-- f.health.OrigSetValue = f.health.SetValue
+		-- f.health.SetValue = self.SetValueSmooth
+	-- elseif self.CutawayBar then
+		-- self.CutawayBar(f.health)
+	-- end
+	f.health:SetBackdrop({
+		bgFile = "Interface\\AddOns\\UnitPlates\\img\\WHITE", -- A solid texture
+		edgeFile = "Interface\\AddOns\\UnitPlates\\img\\WHITE", 
+		edgeSize = 1, 
+		insets = { left = -minimalOnePixel, right = -minimalOnePixel, top = -minimalOnePixel, bottom = -minimalOnePixel }
+	})
+	f.health:SetBackdropColor(0, 0, 0, 1) -- Black Background
+	f.health:SetBackdropBorderColor(0, 0, 0, 1) -- Black Border
+	f.health:ClearAllPoints()
+	f.health:SetSize(nameplateHealthBarWidth, nameplateHealthBarHeight)
+	f.health:SetPoint("BOTTOMLEFT", f.x, f.y)
+	
+	-- self:CreateHealthText(frame, f)
+	-- f.health.p = f:CreateFontString(f.overlay, {
+		-- font = self.font,
+		-- size = "health",
+		-- alpha = 1,
+		-- outline = "OUTLINE"
+	-- })
+	-- f.health.p:SetHeight(10)
+	-- f.health.p:SetJustifyH("RIGHT")
+	-- f.health.p:SetJustifyV("MIDDLE")
+	-- f.health.p.osize = "health" -- original font size used to update/restore
+	--nameplate.health.text:SetAllPoints()
+	f.health.p = f.health:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	f.health.p:SetFont("Interface\\AddOns\\UnitPlates\\fonts\\francois.ttf", healthBigFontSize, "OUTLINE")
+	f.health.p:SetJustifyH("RIGHT")
+	f.health.p:SetTextColor(1,1,1,1)
+	f.health.p:ClearAllPoints()
+	f.health.p:SetPoint("BOTTOMRIGHT", f.health, "BOTTOMRIGHT", -1 * minimalOnePixel, -(healthBigFontSize * 0.4))
+	f.health.p:Show()
+	
+	f.health.percentage = f.health:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	f.health.percentage:SetFont("Fonts\\FRIZQT__.TTF", healthPercentageFontSize)
+	f.health.percentage:SetJustifyH("CENTER")
+	f.health.percentage:SetPoint("CENTER", f.health, "CENTER", 0, 0)
+	f.health.percentage:SetTextColor(1,1,1,1)
+	f.health.percentage:SetText("69%")
+
+	-- overlay - frame level above health bar, used for text -------------------
+	f.overlay = CreateFrame("Frame", nil, f)
+	f.overlay:SetAllPoints(f.health)
+	f.overlay:SetFrameLevel(2)
+
+	-- self:CreateHighlight(frame, f)
+	-- f.highlight = f.overlay:CreateTexture(nil, "ARTWORK")
+	-- f.highlight:SetTexture(addon.bartexture)
+	-- f.highlight:SetAllPoints(f.health)
+	-- f.highlight:SetVertexColor(1, 1, 1)
+	-- f.highlight:SetBlendMode("ADD")
+	-- f.highlight:SetAlpha(.05)
+	-- f.highlight:Hide()
+	
+	f.typeIcon = CreateFrame("Frame", nil, f)
+	f.typeIcon:SetFrameLevel(1)
+	f.typeIcon:SetPoint("RIGHT", f.health, "LEFT", -1 * minimalOnePixel, 0)
+	f.typeIcon:SetHeight(nameplateTypeIconSize)
+	f.typeIcon:SetWidth(nameplateTypeIconSize)
+	f.typeIcon.icon = f.typeIcon:CreateTexture(nil, "OVERLAY")
+	f.typeIcon.icon:SetAllPoints()
+	--f.typeIcon.icon:SetTexture("Interface\\AddOns\\UnitPlates\\img\\creaturetypes\\UNKNOWN.tga")
+	f.typeIcon.icon:SetTexture("Interface\\AddOns\\UnitPlates\\img\\loading.tga")
+	--CreateBackdrop(nameplate.typeIcon, 1)
+	f.typeIcon:SetBackdrop({
+		bgFile = "Interface\\AddOns\\UnitPlates\\img\\WHITE", -- A solid texture
+		edgeFile = "Interface\\AddOns\\UnitPlates\\img\\WHITE", 
+		edgeSize = 1, 
+		insets = { left = -minimalOnePixel, right = -minimalOnePixel, top = -minimalOnePixel, bottom = -minimalOnePixel }
+	})
+	f.typeIcon:SetBackdropColor(0, 0, 0, 1) -- Black Background
+	f.typeIcon:SetBackdropBorderColor(0, 0, 0, 1) -- Black Border
+	f.typeIcon:Show()
+	
+	
+	f.threat = CreateFrame("Frame", nil, f)
+	f.threat:SetFrameLevel(1)
+	f.threat:SetPoint("TOP", f.typeIcon, "BOTTOM", 0, -1 * minimalOnePixel)
+	f.threat:SetHeight(threatFrameSize)
+	f.threat:SetWidth(threatFrameSize)
+	
+	f.threat.text = f.threat:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	f.threat.text:SetFont("Interface\\AddOns\\UnitPlates\\fonts\\francois.ttf", threatFontSize, "OUTLINE")
+	f.threat.text:SetJustifyH("RIGHT")
+	f.threat.text:SetTextColor(1,1,1,1)
+	f.threat.text:ClearAllPoints()
+	f.threat.text:SetPoint("TOPRIGHT", f.threat, "TOPRIGHT", 0, -1 * minimalOnePixel)
+	f.threat.text:SetText("100%")
+	f.threat.text:Hide()
+
+	-- self:CreateLevel(frame, f)
+	-- f.level = f:CreateFontString(f.level, {
+		-- reset = true,
+		-- font = self.font,
+		-- size = "level",
+		-- alpha = 1,
+		-- outline = "OUTLINE"
+	-- })
+	-- f.level:SetParent(f.overlay)
+	-- f.level:SetJustifyH("LEFT")
+	-- f.level:SetJustifyV("MIDDLE")
+	-- f.level:SetHeight(10)
+	-- f.level:ClearAllPoints()
+	-- f.level.osize = "level" -- original font size used to update/restore
+	
+	-- f.level:ClearAllPoints()
+	f.level = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	f.level:SetFont("Interface\\AddOns\\UnitPlates\\fonts\\francois.ttf", levelFontSize, "OUTLINE")
+	f.level:SetParent(f.overlay)
+	f.level:SetJustifyH("CENTER")
+	-- f.level:SetPoint("RIGHT", f.typeIcon, "RIGHT", -2, -4)
+	f.level:ClearAllPoints()
+	f.level:SetPoint("BOTTOMLEFT", f.health, "BOTTOMLEFT", 2 * minimalOnePixel, -(levelFontSize * 0.4))
+	f.oldLevel.enabled = true
+	f.oldLevel:Hide()
+	
+	-- f.guild = f:CreateFontString(f.overlay, {
+		-- font = self.font,
+		-- size = "name",
+		-- outline = "OUTLINE"
+	-- })
+	-- f.guild.osize = "name" -- original font size used to update/restore
+	-- f.guild:SetHeight(10)
+	f.guild = f:CreateFontString(nil, "OVERLAY")
+	f.guild:SetFont("Interface\\AddOns\\UnitPlates\\fonts\\francois.ttf", nameFontSize, "OUTLINE")
+	f.guild:ClearAllPoints()
+	f.guild:SetWidth(0)
+	f.guild:SetPoint("BOTTOM", f.health, "TOP", 0, 2 * minimalOnePixel)
+	
+	-- f.name = f:CreateFontString(f.overlay, {
+		-- font = self.font,
+		-- size = "name",
+		-- outline = "OUTLINE"
+	-- })
+	-- f.name.osize = "name" -- original font size used to update/restore
+	
+	f.name = f:CreateFontString(nil, "OVERLAY")
+	f.name:SetFont("Interface\\AddOns\\UnitPlates\\fonts\\francois.ttf", nameFontSize, "OUTLINE")
+	--f.name:SetHeight(10)
+	f.name:ClearAllPoints()
+	f.name:SetWidth(0)
+	if (f.guild:GetText() == nil or f.guild:GetText() == '') then
+		f.name:SetPoint("BOTTOM", f.health, "TOP", 0, 2 * minimalOnePixel)
+	else
+		f.name:SetPoint("BOTTOM", f.guild, "TOP", 0, 2 * minimalOnePixel)
+	end
+	
+	f.combatIcon = CreateFrame("Frame", nil, f)
+	f.combatIcon:SetFrameLevel(0)
+	f.combatIcon:SetPoint("LEFT", f.name, "RIGHT", -0, -0)
+	f.combatIcon:SetHeight(combatIconSize)
+	f.combatIcon:SetWidth(combatIconSize)
+	f.combatIcon.icon = f.combatIcon:CreateTexture(nil, "OVERLAY")
+	f.combatIcon.icon:SetAllPoints()
+	f.combatIcon.icon:SetTexture("Interface\\AddOns\\UnitPlates\\img\\combat\\swords_combat_2")
+	f.combatIcon:Hide()
+	
+	------CHAT BUBBLE
+	f.chatBubble = CreateFrame("Frame", nil, f)
+	f.chatBubble:SetHeight(5)
+	f.chatBubble:SetWidth(5)
+	f.chatBubble:SetPoint("BOTTOM", f.name, "TOP", 0, 10)
+	local insets = 16
+	f.chatBubble:SetBackdrop({
+		bgFile = "Interface\\Tooltips\\ChatBubble-Background",
+		edgeFile = "Interface\\Tooltips\\ChatBubble-Backdrop",
+		tile = true,
+		tileSize = 16,
+		edgeSize = 16,
+		insets = { left = insets, right = insets, top = insets, bottom = insets }
+	})
+	f.chatBubble:SetBackdropColor(1,1,1,1)
+	f.chatBubble:SetBackdropBorderColor(1,1,1,1)
+	f.chatBubble.fontMeasure = f.chatBubble:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	f.chatBubble.font = f.chatBubble:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+
+	updateCustomBalloonText(f, "Placeholder", f.name:GetTextColor())
+	UPCoreFrameFadeRemoveFrame(f.chatBubble)
+	
+	f.chatBubble.font:SetPoint("CENTER", f.chatBubble, "CENTER", 0, 0)
+	f.chatBubble.font:SetJustifyH("CENTER")
+	
+	f.chatBubble.tail = f.chatBubble:CreateTexture(nil, "OVERLAY")
+	f.chatBubble.tail:SetTexture("Interface/Tooltips/ChatBubble-Tail")
+	f.chatBubble.tail:SetWidth(24)
+	f.chatBubble.tail:SetHeight(18)
+	f.chatBubble.tail:SetPoint("TOP", f.chatBubble, "BOTTOM", -10, 3.5)
+	
+	f:SetFrameStrata("LOW")
+	
+	f.chatBubble:Hide()
+	
+	------CHAT BUBBLE END
+	
+	
+	
+	
+	f.power = CreateFrame("StatusBar", nil, f)
+	f.power:SetFrameLevel(1) -- keep above glow
+	f.power:SetOrientation("HORIZONTAL")
+	f.power:SetPoint("TOP", f.health, "BOTTOM", 0, 0)
+	f.power:SetStatusBarTexture("Interface\\AddOns\\UnitPlates\\img\\statusbar\\XPerl_StatusBar7")
+	f.power.hlr, f.power.hlg, f.power.hlb, f.power.hla = glowr, glowg, glowb, 1
+	f.power:SetWidth(nameplateHealthBarWidth)
+	f.power:SetHeight(nameplatePowerBarHeight)
+	f.power:SetBackdrop({
+		bgFile = "Interface\\AddOns\\UnitPlates\\img\\WHITE", -- A solid texture
+		edgeFile = "Interface\\AddOns\\UnitPlates\\img\\WHITE", 
+		edgeSize = 1, 
+		insets = { left = -minimalOnePixel, right = -minimalOnePixel, top = -minimalOnePixel, bottom = -minimalOnePixel }
+	})
+	f.power:SetBackdropColor(0, 0, 0, 1) -- Black Background
+	f.power:SetBackdropBorderColor(0, 0, 0, 1) -- Black Border
+	f.power:Hide()
+	
+	f.power.text = f.power:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	f.power.text:SetFont("Interface\\AddOns\\UnitPlates\\fonts\\francois.ttf", powerFontSize, "OUTLINE")
+	f.power.text:SetJustifyH("RIGHT")
+	f.power.text:SetPoint("BOTTOMRIGHT", f.power, "BOTTOMRIGHT", -1 * minimalOnePixel, -(powerFontSize * 0.5))
+	f.power.text:SetText("69")
+	f.power.text:SetTextColor(1,1,1,1)
+	
+	f.classIcon = CreateFrame("Frame", nil, f)
+	f.classIcon:SetPoint("RIGHT", f.name, "LEFT", -2 * minimalOnePixel, 4 * minimalOnePixel)
+	f.classIcon:SetHeight(nameplateClassIconSize)
+	f.classIcon:SetWidth(nameplateClassIconSize)
+	f.classIcon.icon = f.classIcon:CreateTexture(nil, "ARTWORK")
+	f.classIcon.icon:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
+	f.classIcon.icon:SetAllPoints()
+	f.classIcon:Hide()
+	
+	f.rarityIcon = CreateFrame("Frame", nil, f)
+	f.rarityIcon:SetFrameLevel(0)
+	f.rarityIcon:SetPoint("RIGHT", f.typeIcon, "LEFT", nameplateRarityXOffset, -1 * minimalOnePixel)
+	f.rarityIcon:SetHeight(nameplateRarityH)
+	f.rarityIcon:SetWidth(nameplateRarityW)
+	f.rarityIcon.icon = f.rarityIcon:CreateTexture(nil, "BORDER")
+	f.rarityIcon.icon:SetTexCoord(1, 0, 0, 1)
+	f.rarityIcon.icon:SetVertexColor(1, 1, 0, 1)
+	f.rarityIcon.icon:SetAllPoints()
+	f.rarityIcon.icon:SetTexture("Interface\\AddOns\\UnitPlates\\img\\frame_elite")
+	f.rarityIcon:Hide()
+
+	f.rarityIconR = CreateFrame("Frame", nil, f)
+	f.rarityIconR:SetFrameLevel(0)
+	f.rarityIconR:SetPoint("LEFT", f.health, "RIGHT", -nameplateRarityXOffset, -1 * minimalOnePixel)
+	f.rarityIconR:SetHeight(nameplateRarityH)
+	f.rarityIconR:SetWidth(nameplateRarityW)
+	f.rarityIconR.icon = f.rarityIconR:CreateTexture(nil, "BORDER")
+	--nameplate.rarityIconR.icon:SetTexCoord(1, 0, 0, 1)
+	f.rarityIconR.icon:SetVertexColor(1, 1, 0, 1)
+	f.rarityIconR.icon:SetAllPoints()
+	f.rarityIconR.icon:SetTexture("Interface\\AddOns\\UnitPlates\\img\\frame_elite")
+	f.rarityIconR:Hide()
+
+	-- castbar #################################################################
+	-- if self.Castbar then
+		-- self.Castbar:CreateCastbar(f)
+	-- end
+	-- self.Castbar:CreateCastbar(f)
+
+	-- target highlight --------------------------------------------------------
+	f.glow = f:CreateTexture(nil, "BACKGROUND")
+	f.glow:SetPoint("LEFT", f.typeIcon, "LEFT", -nameplateArrowSize, 0)
+	f.glow:SetTexture("Interface\\AddOns\\UnitPlates\\img\\arrow_left")
+	--nameplate.glow:SetFrameLevel(1)
+	f.glow:SetDrawLayer("BACKGROUND")
+	f.glow:SetWidth(nameplateArrowSize)
+	f.glow:SetHeight(nameplateArrowSize)
+	f.glow:SetVertexColor(unpack(glowColor))
+	f.glow:Hide()
+
+	f.glow2 = f:CreateTexture(nil, "BACKGROUND")
+	f.glow2:SetPoint("RIGHT", f.health, "RIGHT", nameplateArrowSize, 0)
+	f.glow2:SetTexture("Interface\\AddOns\\UnitPlates\\img\\arrow_right")
+	--nameplate.glow:SetFrameLevel(1)
+	f.glow2:SetDrawLayer("BACKGROUND")
+	--nameplate.glow2.texture:SetRotation(2)
+	f.glow2:SetWidth(nameplateArrowSize)
+	f.glow2:SetHeight(nameplateArrowSize)
+	f.glow2:SetVertexColor(unpack(glowColor))
+	f.glow2:Hide()
+	
+	-- f.targetGlow = f.overlay:CreateTexture(nil, "ARTWORK")
+	-- f.targetGlow:SetTexture("Interface\\AddOns\\UnitPlates\\Media\\target-glow")
+	-- f.targetGlow:SetTexCoord(0, .593, 0, .875)
+	-- f.targetGlow:SetPoint("CENTER", f.health, "CENTER", 0, -10)
+	-- f.targetGlow:SetVertexColor(unpack(self.db.profile.general.targetglowcolour))
+	-- f.targetGlow:Hide()
+	-- f.targetGlow:SetSize(nameplateHealthBarWidth, nameplateHealthBarHeight*4)
+
+	-- raid icon ---------------------------------------------------------------
+	f.icon:SetParent(f.overlay)
+	f.icon:SetSize(raidIconSize, raidIconSize)
+	f.icon:ClearAllPoints()
+	f.icon:SetPoint("TOP", f.overlay, "BOTTOM", 0, -8 * minimalOnePixel)
+	
+	----------------------------------------------------------------------------
+	
+	f.castWarning = CreateFrame("Frame", nil, f)
+	f.castWarning:SetFrameLevel(0)
+	f.castWarning:SetPoint("TOP", f.power, "BOTTOM", 0, -5 * minimalOnePixel)
+	f.castWarning:SetWidth(1)
+	f.castWarning:SetHeight(1)
+	f.castWarning:Hide()
+	
+	f.castWarning.bar = CreateFrame("StatusBar", nil, f.castWarning)
+	f.castWarning.bar:SetStatusBarTexture("Interface\\AddOns\\UnitPlates\\img\\statusbar\\XPerl_StatusBar7")
+	f.castWarning.bar:GetStatusBarTexture():SetDrawLayer("ARTWORK", 2)
+	f.castWarning.bar:SetStatusBarColor(unpack(castBarColor))
+	f.castWarning.bar:SetHeight(4)
+	f.castWarning.bar:SetWidth(nameplateHealthBarWidth)
+	f.castWarning.bar:SetPoint("TOP", f.castWarning, "TOP", 0, 0)
+	f.castWarning.bar:SetMinMaxValues(0, 1)
+	
+	f.castWarning.bar:SetBackdrop({
+		bgFile = "Interface\\AddOns\\UnitPlates\\img\\WHITE", -- A solid texture
+		edgeFile = "Interface\\AddOns\\UnitPlates\\img\\WHITE", 
+		edgeSize = 1, 
+		insets = { left = -minimalOnePixel, right = -minimalOnePixel, top = -minimalOnePixel, bottom = -minimalOnePixel }
+	})
+	f.castWarning.bar:SetBackdropColor(0, 0, 0, 1) -- Black Background
+	f.castWarning.bar:SetBackdropBorderColor(0, 0, 0, 1) -- Black Border
+	
+	-- uninterruptible cast shield -----------------------------------------
+	f.castWarning.shield = f.castWarning.bar:CreateTexture(nil, "ARTWORK")
+	f.castWarning.shield:SetTexture("Interface\\AddOns\\UnitPlates\\Media\\Shield")
+	f.castWarning.shield:SetTexCoord(0, 0.84375, 0, 1)
+	f.castWarning.shield:SetVertexColor(0.5, 0.5, 0.7)
+
+	f.castWarning.shield:SetSize(castBarSizes.shield * .84375, castBarSizes.shield)
+	f.castWarning.shield:SetPoint("LEFT", f.castWarning.bar, -7 * minimalOnePixel, 0)
+
+	f.castWarning.shield:SetBlendMode("BLEND")
+	f.castWarning.shield:SetDrawLayer("ARTWORK", 7)
+	
+	--
+	f.castWarning.spark = f.castWarning.bar:CreateTexture(nil, "ARTWORK")
+	f.castWarning.spark:SetDrawLayer("ARTWORK", 6)
+	f.castWarning.spark:SetVertexColor(1, 1, 0.8)
+	f.castWarning.spark:SetTexture("Interface\\AddOns\\UnitPlates\\Media\\t\\spark")
+	f.castWarning.spark:SetPoint("TOP", f.castWarning.bar:GetRegions(), "TOPRIGHT", 0, 3 * minimalOnePixel)
+	f.castWarning.spark:SetPoint("BOTTOM", f.castWarning.bar:GetRegions(), "BOTTOMRIGHT", 0, -3 * minimalOnePixel)
+	f.castWarning.spark:SetWidth(6)
+	
+	f.castWarning.curr = f.castWarning.bar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	f.castWarning.curr:SetFont("Interface\\AddOns\\UnitPlates\\fonts\\francois.ttf", castWarningDurationFontSize, "OUTLINE")
+	--f.castWarning.curr:SetPoint("LEFT", f.castWarning.bar, "RIGHT", 2, 0)
+	f.castWarning.curr:SetPoint("BOTTOMRIGHT", f.castWarning.bar, "BOTTOMRIGHT", -1 * minimalOnePixel, -(castWarningDurationFontSize * 0.65))
+	f.castWarning.curr:SetText("0")
+	
+	f.castWarning.text = f.castWarning:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	f.castWarning.text:SetFont("Interface\\AddOns\\UnitPlates\\fonts\\francois.ttf", castWarningNameFontSize, "OUTLINE")
+	f.castWarning.text:SetPoint("TOP", f.castWarning.bar, "BOTTOM", 0, -5)
+	-- f.castWarning.text:SetText("69")
+	-- f.castWarning.text:SetTextColor(1,1,1,1)
+	
+	f.castWarning.icon = CreateFrame("Frame", nil, f.castWarning)
+	f.castWarning.icon:SetFrameLevel(0)
+	f.castWarning.icon:SetPoint("RIGHT", f.castWarning.text, "LEFT", -2 * minimalOnePixel, 0)
+	f.castWarning.icon:SetHeight(castBarSizes.icon)
+	f.castWarning.icon:SetWidth(castBarSizes.icon)
+	f.castWarning.icon.tex = f.castWarning.icon:CreateTexture(nil, "ARTWORK")
+	f.castWarning.icon.tex:SetAllPoints()
+	-- f.castWarning.icon.tex:SetTexture("Interface\\AddOns\\UnitPlates\\img\\loading.tga")
+	
+	f.castWarning.currentValue = 0
+	f.castWarning.startTime = 0
+	f.castWarning.endTime = 0
+	f.castWarning.castTime = 0
+	
+	---------------------------------------------------------------------------------
+
+	-- scripts -------------------------------------------------------------
+	-- f.castbar:RegisterEvent("UNIT_SPELLCAST_START")
+	-- f.castbar:RegisterEvent("UNIT_SPELLCAST_CHANNEL_START")
+	--cast bar end
+	
+	-- create combo points
+	f.combopoints = CreateFrame("Frame", nil, f.overlay)
+	f.combopoints:Hide()
+
+	local pcp
+	for i = 0, 4 do
+		-- create individual combo point icons
+		-- size and position of first icon is set in ScaleComboPoints
+		local cp = f.combopoints:CreateTexture(nil, "ARTWORK")
+		cp:SetDrawLayer("ARTWORK", 2)
+		cp:SetTexture("Interface\\AddOns\\UnitPlates\\Media\\combopoint-round")
+
+		if i > 0 then
+			cp:SetPoint("LEFT", pcp, "RIGHT", combopointsSizes.spacing, 0)
+		end
+
+		tinsert(f.combopoints, i + 1, cp)
+		pcp = cp
+	end
+
+	for i, cp in ipairs(f.combopoints) do
+		cp:SetSize(combopointsSizes.combopoints, combopointsSizes.combopoints)
+
+		if i == 1 then
+			-- place first icon to offset others to center
+			cp:SetPoint("BOTTOM", f.health, "BOTTOM", -(combopointsSizes.combopoints + combopointsSizes.spacing) * 2, -(combopointsSizes.combopoints / 2))
+		end
+	end
+	-- create combo points end
+	
+	--totem
+	frame.totem = CreateFrame("Frame", nil, frame)
+	frame.totem:SetPoint("TOP", frame, "TOP", 0, 0)
+	frame.totem:SetHeight(totemIconSize)
+	frame.totem:SetWidth(totemIconSize)
+	frame.totem.icon = frame.totem:CreateTexture(nil, "OVERLAY")
+	frame.totem.icon:SetTexCoord(.078, .92, .079, .937)
+	frame.totem.icon:SetAllPoints()
+	frame.totem:SetBackdrop({
+		bgFile = "Interface\\AddOns\\UnitPlates\\img\\WHITE", -- A solid texture
+		edgeFile = "Interface\\AddOns\\UnitPlates\\img\\WHITE", 
+		edgeSize = 1, 
+		insets = { left = -(3 * minimalOnePixel), right = -(3 * minimalOnePixel), top = -(3 * minimalOnePixel), bottom = -(3 * minimalOnePixel) }
+	})
+	frame.totem:SetBackdropColor(0, 0, 0, 1) -- Black Background
+	frame.totem:SetBackdropBorderColor(0, 0, 0, 1) -- Black Border
+	--frame.totem:SetVertexColor(1, 1, 1, 1)
+	frame.totem:Hide()
+	--totem END
+	
+	--debuffs
+	f.unitBuffs = {}
+	
+	f.debuffContainer = CreateFrame("Frame", nil, f)
+	f.debuffContainer:SetPoint("BOTTOM", f.name, "TOP", 0, nameplateClassIconSize / 2)
+	f.debuffContainer:SetHeight(nameplateHealthBarHeight)
+	f.debuffContainer:SetWidth(nameplateHealthBarWidth)
+	--debuff onupdate
+	f.debuffContainer:SetScript("OnUpdate", function(self, elapsed)
+		self.nextUpdate = (self.nextUpdate or 0) - elapsed
+		if self.nextUpdate > 0 then return end
+		self.nextUpdate = 0.1 
+		
+		--THIS IS DEBUFF FRAMES UPDATE
+		--print("here")
+		
+		local currentTime = GetTime()
+		
+		-- Safely remove expired debuffs by iterating backwards
+		for i = table.getn(f.unitBuffs), 1, -1 do
+			local debuff = f.unitBuffs[i]
+			-- Check if it has an expiration time and if that time has passed
+			local timeLeftSeconds = debuff.expirationTime - currentTime
+			if timeLeftSeconds <= 0 then
+				table.remove(f.unitBuffs, i)
+			end
+		end
+		--
+		
+		local activeUnitBuffCount = table.getn(f.unitBuffs)
+		
+		local hasDebuffRow = false
+		local firstDebuffIndex = 1
+		local firstDebuffRow = 1
+		local buffrows = 0
+		local lastBuffYOffset = 0
+		local hadAnyBuffs = false
+		
+		--iterating through stored list
+		local iconIndex = 1    
+		for _, debuff in ipairs(f.unitBuffs) do
+			local name = debuff.name
+			local texture = debuff.texture
+			local count = debuff.count
+			local duration = debuff.duration
+			local expirationTime = debuff.expirationTime
+			
+			-- Stop if no more debuffs OR if we ran out of our MAX icons
+			if not name or iconIndex > maxDebuffs then
+				break 
+			end
+			
+			--setup icon
+			local icon = f.debuffContainer.debuffIcons[iconIndex]
+			
+			icon.isDebuff = debuff.isDebuff
+			
+			-- Set Texture
+			icon.tex:SetTexture(texture)
+			
+			--set count
+			icon.count = count
+			
+			-- Set Cooldown
+			if duration > 0 then
+				icon.expirationTime = expirationTime
+				icon.duration = duration
+				icon.startTime = expirationTime - duration
+			else
+				icon.expirationTime = 0
+				icon.duration = 0
+				icon.startTime = 0
+			end
+			
+			-- Position the icon dynamically
+			--determine icon size based on active count and max in row
+			
+			if activeUnitBuffCount <= 8 then
+				if UnitPlatesSettings.smallerAuras then
+					maxDebuffsInRow = 6
+				else
+					maxDebuffsInRow = 4
+				end
+			elseif activeUnitBuffCount <= 16 then
+				if UnitPlatesSettings.smallerAuras then
+					maxDebuffsInRow = 6
+				else
+					maxDebuffsInRow = 5
+				end
+			elseif activeUnitBuffCount <= 24 then
+				maxDebuffsInRow = 6
+			else
+				maxDebuffsInRow = 7
+			end
+			
+			
+			local iconSize = (nameplateHealthBarWidth / maxDebuffsInRow) - debuffIconOffset
+			if f.isGrayLevel or f.isPet then
+				iconSize = (nameplateWidthGrayLevel / maxDebuffsInRow) - debuffIconOffset
+			end
+			
+			local column = (iconIndex - 1) % maxDebuffsInRow          -- Results in 0, 1, 2, 3
+			local row = math.floor((iconIndex - 1) / maxDebuffsInRow) -- Results in 0, 1, 2...
+			
+			if not debuff.isDebuff then
+				hadAnyBuffs = true
+			end
+			if hadAnyBuffs and debuff.isDebuff and firstDebuffIndex == 1 then
+				buffrows = (math.floor((iconIndex - 1 - 1) / maxDebuffsInRow))
+				firstDebuffIndex = iconIndex
+				firstDebuffRow = row
+			end
+			
+			if firstDebuffIndex > 1 then
+				-- row = row + 1
+				column = (iconIndex - firstDebuffIndex) % maxDebuffsInRow
+				row = math.floor((iconIndex - firstDebuffIndex) / maxDebuffsInRow)
+			end
+			
+			local xOffset = column * (iconSize + debuffIconOffset)
+			local yOffset = row * (iconSize + debuffIconOffset)
+			
+			if firstDebuffIndex > 1 then
+				yOffset = (buffrows * (iconSize + debuffIconOffset)) + (row * (iconSize + debuffIconOffset)) + (iconSize * 1.3)
+			end
+			
+			icon:SetSize(iconSize, iconSize)
+			local timeLeftSeconds = debuff.expirationTime - currentTime
+			if timeLeftSeconds >= 60 then
+				icon.cdText:SetFont("Fonts\\FRIZQT__.TTF", iconSize/2.6, "OUTLINE")
+			else
+				icon.cdText:SetFont("Fonts\\FRIZQT__.TTF", iconSize/2, "OUTLINE")
+			end
+			icon.countText:SetFont("Interface\\AddOns\\UnitPlates\\fonts\\francois.ttf", iconSize/3, "OUTLINE")
+			
+			icon:ClearAllPoints()
+			-- We use BOTTOMLEFT so that as 'row' increases, icons move UP (on top)
+			icon:SetPoint("BOTTOMLEFT", f.debuffContainer, "BOTTOMLEFT", xOffset, yOffset)
+			
+			icon:Show()
+			iconIndex = iconIndex + 1
+		end
+		
+		--Hide any remaining icons in our pool that aren't being used
+		for i = iconIndex, maxDebuffs do
+			f.debuffContainer.debuffIcons[i]:Hide()
+		end
+	end)
+	--debuff onupdate end
+	
+	--create icons
+	f.debuffContainer.debuffIcons = {} -- Table to hold our icon frames
+	--f.debuffContainer:SetFrameStrata("TOOLTIP")	
+	for i = 1, maxDebuffs do		
+		local icon = CreateFrame("Frame", nil, f.debuffContainer)
+		icon:SetSize(16, 16)
+		icon:SetFrameLevel(1)
+		
+		icon.tex = icon:CreateTexture(nil, "BACKGROUND")
+		icon.tex:SetTexture("Interface\\AddOns\\UnitPlates\\img\\loading.tga")
+		icon.tex:SetAllPoints(icon)
+		--icon.tex:SetFrameLevel(0)
+		
+		icon.countText = icon:CreateFontString(nil, "OVERLAY", "SubSpellFont")
+		icon.countText:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 2, 0)
+		icon.countText:SetFont("Interface\\AddOns\\UnitPlates\\fonts\\francois.ttf", powerFontSize, "OUTLINE")
+		icon.countText:SetTextColor(1,1,1,1)
+		
+		icon.cdText = icon:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		icon.cdText:SetPoint("CENTER", icon, "CENTER", 0, 0)
+		icon.cdText:SetFont("Interface\\AddOns\\UnitPlates\\fonts\\francois.ttf", levelFontSize, "OUTLINE")
+		icon.cdText:SetTextColor(1,1,1,1)
+		
+		icon.quads = {
+			TR = UPCoreCreateQuadrant(icon, "TOPRIGHT"),
+			BR = UPCoreCreateQuadrant(icon, "BOTTOMRIGHT"),
+			BL = UPCoreCreateQuadrant(icon, "BOTTOMLEFT"),
+			TL = UPCoreCreateQuadrant(icon, "TOPLEFT"),
+		}
+		
+		icon:SetScript("OnUpdate", function(self, elapsed)
+			if self:IsShown() then
+				self.nextUpdate = (self.nextUpdate or 0) - elapsed
+				if self.nextUpdate > 0 then return end
+				self.nextUpdate = 0.1 
+				
+				--count
+				if self.count and self.count > 0 then
+					self.countText:SetText(""..self.count)
+				else
+					self.countText:SetText("")
+				end
+				
+				--time left
+				local timeLeftSeconds = self.expirationTime-GetTime()
+				if timeLeftSeconds > 0 then
+					local cooldownText = ""..timeLeftSeconds
+					if timeLeftSeconds >= 60*60 then
+						cooldownText = math.floor(timeLeftSeconds / 3600) .. "h"
+						if self.isDebuff then
+							self.cdText:SetTextColor(0.70, 0.30, 1.0, 1.0)
+						else
+							self.cdText:SetTextColor(0.53,0.81,0.98,1)
+						end
+					elseif timeLeftSeconds >= 60 then
+						cooldownText = math.floor(timeLeftSeconds / 60) .. "m"
+						if self.isDebuff then
+							self.cdText:SetTextColor(0.70, 0.30, 1.0, 1.0)
+						else
+							self.cdText:SetTextColor(0.53,0.81,0.98,1)
+						end
+					elseif timeLeftSeconds >= 1 then
+						cooldownText = math.floor(timeLeftSeconds) .. ""
+						if self.isDebuff then
+							self.cdText:SetTextColor(1,0.8,0.8,1)
+						else
+							self.cdText:SetTextColor(0.8,0.8,1,1)
+						end
+						if timeLeftSeconds <= 3 then
+							self.cdText:SetTextColor(0.99,0,0,1)
+						elseif timeLeftSeconds <= 7 then
+							self.cdText:SetTextColor(0.99,0.99,0,1)
+						end
+					elseif timeLeftSeconds > 0 then
+						local s = string.format("%.1f", timeLeftSeconds)
+						--cooldownText = string.gsub(s, "^0", "")
+						cooldownText = string.sub(s, 2)
+						self.cdText:SetTextColor(0.99,0,0,1)
+					else
+						cooldownText = "0"
+						self.cdText:SetTextColor(0.99,0,0,1)
+					end
+					
+					self.cdText:SetText(cooldownText)--show
+				else
+					self.cdText:SetText("0")--show
+				end
+				
+				local pct = timeLeftSeconds / self.duration -- 1.0 down to 0.0
+				if pct > 1 then
+					pct = 1 -- Clamp to 100%
+				end
+				if pct < 0 then
+					pct = 0  -- Clamp to 0%
+				end
+				local size = self:GetWidth() / 2 -- Half the icon size (e.g., 18)
+
+				-- Reset state
+				for _, q in pairs(self.quads) do
+					q:Show()
+					q:SetSize(size, size) 
+				end
+
+				if pct > 0.75 then
+					-- 100% to 75%: Shrink TOP RIGHT width
+					self.quads.TR:SetWidth(size * ((pct - 0.75) / 0.25))
+				elseif pct > 0.50 then
+					-- 75% to 50%: TR is gone, shrink BOTTOM RIGHT height
+					self.quads.TR:Hide()
+					self.quads.BR:SetHeight(size * ((pct - 0.50) / 0.25))
+				elseif pct > 0.25 then
+					-- 50% to 25%: TR/BR gone, shrink BOTTOM LEFT width
+					self.quads.TR:Hide()
+					self.quads.BR:Hide()
+					self.quads.BL:SetWidth(size * ((pct - 0.25) / 0.25))
+				elseif pct > 0 then
+					-- 25% to 0%: Only TL left, shrink TOP LEFT height
+					self.quads.TR:Hide()
+					self.quads.BR:Hide()
+					self.quads.BL:Hide()
+					self.quads.TL:SetHeight(size * (pct / 0.25))
+				else
+					for _, q in pairs(self.quads) do
+						q:Hide()
+					end
+				end
+			end
+		end)
+
+		icon.expirationTime = 0
+		icon.duration = 0
+		icon.startTime = 0
+		icon:Hide() -- Hide by default
+		f.debuffContainer.debuffIcons[i] = icon -- Store in our pool
+	end
+	--debuffs END
+
+	----------------------------------------------------------------- Scripts --
+	frame:HookScript("OnShow", OnFrameShow)
+	frame:HookScript("OnHide", OnFrameHide)
+	frame:HookScript("OnUpdate", OnFrameUpdate)
+
+	f.oldHealth.kuiParent = frame
+	f.oldHealth:HookScript("OnValueChanged", function(self, ...)
+		f:OnHealthValueChanged(...) 
+	end)
+	------------------------------------------------------------ Finishing up --
+	-- addon:SendMessage("UnitPlates_PostCreate", f)
+	
+	------------------------------------------------------------
+
+	if frame:IsShown() then
+		-- force OnShow
+		OnFrameShow(frame)
+	else
+		f:Hide()
+	end
+end
+
+
+
+---------------------------------------------------------------------- Events --
+
+local function OnChatEventInternal(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14)
+
+	--guid is arg12
+	--message is arg1
+	--name is arg2
+	
+	local pGuid = arg12
+	local pName = arg2
+	local pText = arg1
+	
+	-- print("event: "..tostring(event))
+	-- print("arg1: "..tostring(arg1))
+	-- print("arg2: "..tostring(arg2))
+	-- print("arg3: "..tostring(arg3))
+	-- print("arg4: "..tostring(arg4))
+	-- print("arg5: "..tostring(arg5))
+	-- print("arg6: "..tostring(arg6))
+	-- print("arg7: "..tostring(arg7))
+	-- print("arg8: "..tostring(arg8))
+	-- print("arg9: "..tostring(arg9))
+	-- print("arg10: "..tostring(arg10))
+	-- print("arg11: "..tostring(arg11))
+	-- print("arg12: "..tostring(arg12))
+	-- print("arg13: "..tostring(arg13))
+	-- print("arg14: "..tostring(arg14))
+	
+	-- print("receved chat msg event with: "..tostring(arg12).." / "..tostring(arg2).." / "..tostring(arg1))
+	
+	
+	if event == "CHAT_MSG_EMOTE" then
+		local namePlateFrame = UPCoreGetNameplateByName(pName) --addon:GetNameplate(nil, pName)
+		if namePlateFrame and (namePlateFrame.player) then
+			--store guid
+			--addon:StoreGUIDNoUnit(namePlateFrame, pGuid)
+			
+			--print("storing guid for: "..name)
+			if pGuid then
+				namePlateFrame.guid = pGuid
+				UPCoreStoreGuidForName(pName, pGuid)
+			end
+		end
+		return
+	end
+	--early return
+	
+	
+	
+	local namePrefix = ""
+	-- if ((pName ~= nil) and (pName ~= '')) then
+		-- namePrefix = pName..": "
+	-- end
+	
+	local textColor = chatTextColors[event] or {1, 1, 1, 0.99}
+	
+	-- local rr, gg, bb, aa = unpack(textColor)
+	-- print("textColor: "..rr)
+	-- print("textColor: "..gg)
+	-- print("textColor: "..bb)
+	-- print("textColor: "..aa)
+	
+	if ((pGuid ~= nil) and (pGuid ~= '')) then
+		local guidPlateFrame = UPCoreGetNameplateByGuid(pGuid) --addon:GetNameplate(pGuid, nil)
+		if guidPlateFrame then
+			-- print("1found plate for chat evnt : "..tostring(pGuid).." / "..tostring(pName).." / "..tostring(pText))
+			updateCustomBalloonText(guidPlateFrame, namePrefix..pText, unpack(textColor))
+		else
+			local namePlateFrame = UPCoreGetNameplateByName(pName) --addon:GetNameplate(nil, pName)
+			if namePlateFrame and (namePlateFrame.player) then
+				--also store guid?
+				--addon:StoreGUIDNoUnit(namePlateFrame, pGuid)
+				if pGuid then
+					namePlateFrame.guid = pGuid
+					UPCoreStoreGuidForName(pName, pGuid)
+				end
+				--addon:StoreNameWithGUID(namePlateFrame.oldName:GetText(), pGuid)
+				updateCustomBalloonText(namePlateFrame, namePrefix..pText, unpack(textColor))
+			end
+		end
+	else
+		if (pName ~= nil) and (pName ~= '') then
+			--check if name is player, then might as well display
+			local namePlateFrame = UPCoreGetNameplateByName(pName) --addon:GetNameplate(nil, pName)
+			if namePlateFrame and (namePlateFrame.player) then
+				-- print("2found plate for chat evnt : "..tostring(pGuid).." / "..tostring(pName).." / "..tostring(pText))
+				updateCustomBalloonText(namePlateFrame, namePrefix..pText, unpack(textColor))
+			end
+		end
+	end
+end
+
+-- function addon:UNIT_AURA(event, arg1, arg2)
+	-- --local event, arg1, arg2
+	-- -- print(""..event)
+	-- -- print(""..arg1)
+	-- -- print(""..tostring(arg2))
+	-- --arg1 is unitId
+	-- -- if arg1 then
+		-- -- --update debuffs
+		-- -- -- print("try get plate")
+		-- -- local plate = addon:GetUnitPlate(arg1)
+		-- -- if plate then
+		-- -- -- print("has plate")
+			-- -- UpdateDebuffs(plate, arg1)
+		-- -- end
+	-- -- end
+-- end
+
+local function SetCastWarning(self, spellID, spellName, spellSchool, isHeal, amount, targetName)
+	UPCoreFrameFadeRemoveFrame(self.castWarning)
+
+	if spellName == nil then
+		-- hide the warning instantly
+		self.castWarning.icon.tex:SetTexture(nil)
+		self.castWarning.text:SetText()
+		self.castWarning:Hide()
+	else
+		--local name, rank, icon, castTime, minRange, maxRange = GetSpellInfo(spellID)
+		local name, rank, icon, cost, isFunnel, powerType, castTimeMillis = GetSpellInfo(spellID)
+		-- print("here")
+		-- print(""..GetSpellInfo(spellID))
+		if isHeal then
+			if amount >= 0 then
+				-- healing
+				amount = "+" .. amount
+				self.castWarning.text:SetTextColor(0, 1, 0)
+			else
+				-- damage (nyi)
+				amount = "-" .. amount
+				self.castWarning.text:SetTextColor(1, 0, 0)
+			end
+			if targetName then
+				self.castWarning.text:SetText("["..spellName.."]".." "..amount.." (to "..targetName..")")
+			else
+				self.castWarning.text:SetText("["..spellName.."]".." "..amount.."")
+			end
+			self.castWarning.icon.tex:SetTexture(icon)
+		else
+			local col = spellSchoolColors[spellSchool] or {r = 1, g = 1, b = 1}
+			self.castWarning.text:SetTextColor(col.r, col.g, col.b)
+			self.castWarning.text:SetText("["..spellName.."]")
+			self.castWarning.icon.tex:SetTexture(icon)
+		end
+		
+		local currTimeMillis = GetTime()*1000
+		
+		if (castTimeMillis and (castTimeMillis > 0)) then	
+			self.castWarning.currentValue = 0
+			self.castWarning.startTime = currTimeMillis
+			self.castWarning.endTime = currTimeMillis+castTimeMillis
+			self.castWarning.castTime = self.castWarning.endTime-self.castWarning.startTime
+			
+			-- print("--- startTime raw: "..currTime)
+			-- print("--- endTime raw: "..currTime + castTime)
+			-- print("--- startTime raw: "..currTimeMillis)
+			-- print("--- endTime raw: "..currTimeMillis + castTimeMillis)
+		
+			self.castWarning.curr:SetText(string.format("%.1f", self.castWarning.currentValue/1000))
+			self.castWarning.bar:SetMinMaxValues(0, self.castWarning.castTime)
+			self.castWarning.bar:SetValue(self.castWarning.castTime-self.castWarning.currentValue)
+			
+			self.castWarning.bar:SetStatusBarColor(unpack(castBarColor))	
+			self.castWarning.shield:Hide()
+			
+			-- self.castWarning.spark:SetWidth(6)
+			-- UPCoreFadeCastWarningFrame(self.castWarning, 1, 0, 3)
+			
+			self.castWarning:Show()
+		else
+			self.castWarning.currentValue = 0
+			self.castWarning.startTime = 0
+			self.castWarning.endTime = 0
+			self.castWarning.castTime = 0
+			
+			UPCoreFadeCastWarningFrame(self.castWarning, 1, 0, 3)
+		end
+	end
+end
+
+local function OnCombatLogUnfiltered(_, castTime, event, guid, name, _, targetGUID, targetName, _, spellID, spellName, spellSchool, amount)
+
+	--print("OnCombatLogUnfiltered name: "..tostring(name))
+	--print("OnCombatLogUnfiltered guid: "..tostring(guid))
+
+	local nameFrame = UPCoreGetNameplateByName(name)
+	if name then
+		if nameFrame and (nameFrame.player) then
+			if guid then
+				--print("storing guid for: "..name)
+				nameFrame.guid = guid
+				UPCoreStoreGuidForName(name, guid)
+			end
+		end
+	end
+
+
+	-- if not (guid and targetGUID) then
+		-- return
+	-- end
+	
+	local castWarningEvents = {
+		["SPELL_CAST_START"] = true,
+		["SPELL_CAST_SUCCESS"] = true,
+		["SPELL_INTERRUPT"] = true,
+		["SPELL_HEAL"] = true,
+		["SPELL_PERIODIC_HEAL"] = true
+	}
+
+	if castWarningEvents[event] then
+		-- if event == "SPELL_HEAL" or event == "SPELL_PERIODIC_HEAL" then
+			-- -- fetch the spell's target's nameplate
+			-- guid, name = targetGUID, targetName
+		-- end
+		
+		-- --check if player and use player name later on
+		-- name = nil
+		
+		local f = nil
+		if guid then
+			--try for anybody
+			f = UPCoreGetNameplateByGuid(guid)
+		end
+		if not f then
+			if nameFrame and (nameFrame.player) then
+				--at least do it for player
+				f = nameFrame
+			end
+		end
+		if f then
+			if event == "SPELL_HEAL" or event == "SPELL_PERIODIC_HEAL" then
+				-- display heal warning
+				SetCastWarning(f, spellID, spellName, spellSchool, true, amount, targetName)
+			elseif event == "SPELL_INTERRUPT" then
+				-- hide the warning
+				SetCastWarning(f, nil)
+			else
+				-- or display it for this spell
+				SetCastWarning(f, spellID, spellName, spellSchool, false, 0)
+			end
+		end
+	end
+end
+
+local function OnPlayerEnteringWorld()
+	SetCVar("chatBubbles", 1) 
+    SetCVar("chatBubblesParty", 1)
+	
+	-- Enable overlapping (Disable collision)
+    SetCVar("nameplateAllowOverlap", 1)
+	
+	SetCVar("ShowClassColorInNameplate", 0)
+	
+	SetCVar("showVKeyCastbar", 1)
+	
+	-- force enable threat on nameplates - this is a hidden CVar
+	SetCVar("threatWarning", 3)
+	
+	--UIErrorsFrame:UnregisterEvent("UI_ERROR_MESSAGE")[cite: 1]
+	
+	-- Optional: These are the only other common CVars in 3.3.5
+    -- They control how far away plates appear
+    -- SetCVar("nameplateMaxDistance", 40)
+end
+
+--event processing
+UnitPlatesMainFrame:SetScript("OnEvent", function()
+	addonIsLoaded = true
+
+	if event == "ADDON_LOADED" and arg1 == "UnitPlates" then
+		addonIsLoaded = true
+		--print("----------ADDON_LOADED: "..tostring(arg1))
+		UnitPlatesMainFrame:UnregisterEvent("ADDON_LOADED")
+		
+		if (addonIsLoaded and playerEnteredWorld) then
+			--UnitPlatesMainFrame:UnregisterEvent("PLAYER_ENTERING_WORLD")
+			--CoolHealthBar_OnLoad()
+			UPConfigInitUnitPlatesSettings()
+		end
+	end
+	if event == "PLAYER_ENTERING_WORLD" then
+		playerEnteredWorld = true
+		--print("----------ADDON_LOADED: "..tostring(arg1))
+		UnitPlatesMainFrame:UnregisterEvent("PLAYER_ENTERING_WORLD")
+		
+		if (addonIsLoaded and playerEnteredWorld) then
+			--UnitPlatesMainFrame:UnregisterEvent("ADDON_LOADED")
+			--CoolHealthBar_OnLoad()
+			UPConfigInitUnitPlatesSettings()
+			OnPlayerEnteringWorld()
+		end
+	end
+	
+	if event == "COMBAT_LOG_EVENT_UNFILTERED" then
+		OnCombatLogUnfiltered(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13)
+	end
+	
+	if (event == "CHAT_MSG_SAY") 
+		or (event == "CHAT_MSG_YELL") 
+		or (event == "CHAT_MSG_EMOTE") 
+		or (event == "CHAT_MSG_PARTY") 
+		or (event == "CHAT_MSG_MONSTER_SAY") 
+		or (event == "CHAT_MSG_MONSTER_YELL") then
+		OnChatEventInternal(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13)
+	end
+end)
+
+UnitPlatesMainFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+UnitPlatesMainFrame:RegisterEvent("ADDON_LOADED")
+
+UnitPlatesMainFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+
+UnitPlatesMainFrame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
+UnitPlatesMainFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+UnitPlatesMainFrame:RegisterEvent("PLAYER_FOCUS_CHANGED")
+UnitPlatesMainFrame:RegisterEvent("PARTY_MEMBERS_CHANGED")
+UnitPlatesMainFrame:RegisterEvent("RAID_ROSTER_UPDATE")
+
+UnitPlatesMainFrame:RegisterEvent("CHAT_MSG_SAY")
+UnitPlatesMainFrame:RegisterEvent("CHAT_MSG_YELL")
+UnitPlatesMainFrame:RegisterEvent("CHAT_MSG_EMOTE")
+UnitPlatesMainFrame:RegisterEvent("CHAT_MSG_PARTY")
+UnitPlatesMainFrame:RegisterEvent("CHAT_MSG_MONSTER_SAY")
+UnitPlatesMainFrame:RegisterEvent("CHAT_MSG_MONSTER_YELL")
+--event processing end
+
+
+
+--MAIN LOOP
+UnitPlatesMainFrame:SetScript("OnUpdate", function(self, elapsed)
+    self.TimeToCheck = self.TimeToCheck - elapsed
+    if self.TimeToCheck > 0 then 
+        return -- We haven't counted down to zero yet so do nothing
+    end
+    self.TimeToCheck = 0.01 -- We've waited a second so reset the timer
+	
+	-- find new nameplates
+	local frames = select("#", WorldFrame:GetChildren())
+	if frames ~= self.numFrames then
+		local f
+		for i = 1, frames do
+			f = select(i, WorldFrame:GetChildren())
+			if UPCoreIsNameplate(f) and not f.kui then
+				InitFrame(f)
+				--tinsert(self.frameList, f)
+			end
+		end
+		self.numFrames = frames
+	end
+	
+	
+	
+	-- process group update queue
+	-- if group_update then
+		-- group_update_elapsed = group_update_elapsed + .1
+		-- if group_update_elapsed > GROUP_UPDATE_INTERVAL then
+			-- self:GroupUpdate()
+		-- end
+	-- end
+	
+end)
+--MAIN LOOP END
