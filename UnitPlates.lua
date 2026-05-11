@@ -442,12 +442,12 @@ local function UpdatePlate(self)
 	--
 	--name debug
 	--self.name:SetTextColor(self.oldName:GetTextColor())
-	if guid then
-		self.name:SetText(self.oldName:GetText().." / "..guid)
-		if unitId then
-			self.name:SetText(self.oldName:GetText().." / "..guid.." / "..unitId)
-		end
-	end
+	--if guid then
+	--	self.name:SetText(self.oldName:GetText().." / "..guid)
+	--	if unitId then
+	--		self.name:SetText(self.oldName:GetText().." / "..guid.." / "..unitId)
+	--	end
+	--end
 	--
 	
 	--get guild
