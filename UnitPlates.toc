@@ -5,7 +5,7 @@
 ## Notes: Best nameplates.
 ## SavedVariables: UnitPlatesPlayersCache, UnitPlatesNPCCache
 ## SavedVariablesPerCharacter: UnitPlatesSettings
-## X-Website: https://github.com/Redbu11dev777
+## X-Website: https://github.com/Redbu11dev
 
 UPApi.lua
 UPRepository.lua
